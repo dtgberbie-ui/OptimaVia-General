@@ -1,0 +1,72 @@
+You are my senior full-stack engineer + product designer. Build an MVP web app called “OptimaVia” — an AI-assisted workforce reliability and hiring platform for small and mid-sized businesses in labor-critical industries (home care, logistics/trucking, manufacturing).
+
+PRIMARY GOAL (MVP):
+Enable employers to post full-time jobs and receive ranked applicants based on a simple “Fit & Reliability Score.” Candidates can create a profile and apply. Employers can review applicants, change pipeline status, and contact candidates. Add a simple AI helper that summarizes applicants and drafts outreach messages.
+
+TECH STACK (use these unless you have a better reason):
+- Next.js (App Router) + TypeScript
+- TailwindCSS for styling
+- Prisma ORM + SQLite for local dev (easy to run)
+- Auth: NextAuth (email/password or magic link)
+- Optional AI: OpenAI API (if env var present); otherwise stub with deterministic logic
+
+DELIVERABLES:
+1) A clean, modern UI (white background, lots of spacing) with branding:
+   - App name: OptimaVia
+   - Tagline: “Making Work Reliable.”
+2) Employer and Candidate user roles
+3) Core pages + flows:
+   - Landing page with two CTAs: “I’m an Employer” and “I’m a Worker”
+   - Auth pages (sign up / sign in)
+   - Worker onboarding: create profile (name, phone, location, role(s), years experience, certifications, availability, work preference full-time)
+   - Jobs list page (public): browse jobs + filter by industry and location
+   - Job detail page: apply to job
+   - Employer dashboard: create job posting (industry, title, description, location, pay range, required certifications, schedule)
+   - Employer applicants page per job: list applicants ranked by score; show candidate cards; pipeline statuses (New, Shortlisted, Interview, Hired, Rejected)
+   - Basic messaging: “Copy email” button OR send email via mailto link; store a note/log on outreach
+4) Scoring logic (MVP deterministic):
+   Create a FitScore 0–100 based on:
+   - Role match (0–35)
+   - Certifications match (0–25)
+   - Availability match (0–15)
+   - Experience (0–15)
+   - Proximity (0–10) — if location is available; otherwise ignore
+   Store score per application and sort descending.
+5) AI helper (simple but useful):
+   - On applicant card: “Summarize applicant” button → returns 3 bullet summary
+   - “Draft outreach message” button → generates a short email/text inviting to interview
+   Use OpenAI if OPENAI_API_KEY is set; otherwise generate a template based on profile fields.
+6) Seed data:
+   - 3 employers, 6 jobs (across home care, trucking, manufacturing)
+   - 12 candidate profiles with varied certifications and availability
+
+NON-GOALS (do NOT build yet):
+- Payroll, invoicing, full scheduling system, complex analytics, multi-tenant billing
+Keep the scope tight and shippable.
+
+DATA MODEL (Prisma):
+- User: id, email, passwordHash (or provider), role (EMPLOYER|WORKER), createdAt
+- EmployerProfile: userId, companyName, industryFocus, location
+- WorkerProfile: userId, name, phone, location, roles[], yearsExperience, certifications[], availability, createdAt
+- Job: id, employerId, industry, title, description, location, payMin, payMax, requiredCertifications[], status (OPEN|CLOSED), createdAt
+- Application: id, jobId, workerId, fitScore, status, notes, createdAt
+
+UX REQUIREMENTS:
+- Fast, minimal, professional
+- Clear CTAs and simple language
+- Mobile responsive
+- Use toast notifications for success/errors
+- Protect employer routes behind auth and role check
+
+PROJECT OUTPUT:
+- Create the full project structure and code.
+- Provide instructions to run locally (npm install, prisma migrate, npm run dev).
+- Implement a /seed route or script to seed database.
+- Include a short README with screenshots placeholders and next-step backlog.
+
+NEXT STEPS BACKLOG (include in README):
+- Add phone/SMS integration
+- Add verification (certifications, background check integrations)
+- Add “reliability signals” (attendance/no-show history)
+- Add employer team accounts
+- Add payments and subscriptions
