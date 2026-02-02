@@ -39,6 +39,32 @@ export interface IStorage {
   getApplicationsByJob(jobId: number): Promise<Application[]>;
   getApplicationsByWorker(workerId: number): Promise<Application[]>;
   updateApplicationStatus(id: number, status: string, notes?: string): Promise<Application>;
+
+  // Staff
+  getStaffByEmployer(employerId: number): Promise<Staff[]>;
+  getStaff(id: number): Promise<Staff | undefined>;
+  createStaff(s: InsertStaff): Promise<Staff>;
+  updateStaff(id: number, updates: Partial<InsertStaff>): Promise<Staff>;
+  getEmploymentHistory(staffId: number): Promise<EmploymentHistoryRecord[]>;
+  addEmploymentHistory(h: InsertEmploymentHistory): Promise<EmploymentHistoryRecord>;
+
+  // Tasks
+  getTasksByEmployer(employerId: number): Promise<Task[]>;
+  getTask(id: number): Promise<Task | undefined>;
+  createTask(t: InsertTask): Promise<Task>;
+  updateTask(id: number, updates: Partial<InsertTask>): Promise<Task>;
+  deleteTask(id: number): Promise<void>;
+
+  // Transactions
+  getTransactionsByEmployer(employerId: number, filters?: { type?: string; startDate?: Date; endDate?: Date }): Promise<Transaction[]>;
+  createTransaction(t: InsertTransaction): Promise<Transaction>;
+  getFinancialSummary(employerId: number): Promise<{ totalRevenue: number; totalExpenses: number; netIncome: number }>;
+
+  // Job Board Postings
+  getJobBoardPostings(jobId: number): Promise<JobBoardPosting[]>;
+  createJobBoardPosting(p: InsertJobBoardPosting): Promise<JobBoardPosting>;
+  updateJobBoardPosting(id: number, updates: Partial<InsertJobBoardPosting>): Promise<JobBoardPosting>;
+  getJobBoardPosting(id: number): Promise<JobBoardPosting | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {

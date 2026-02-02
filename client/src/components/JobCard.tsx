@@ -12,7 +12,7 @@ interface JobCardProps {
 
 export function JobCard({ job, isEmployer }: JobCardProps) {
   return (
-    <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary group">
+    <Card className="hover-elevate transition-all duration-300 group" data-testid={`card-job-${job.id}`}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>

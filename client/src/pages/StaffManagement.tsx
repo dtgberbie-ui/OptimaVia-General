@@ -167,9 +167,9 @@ export default function StaffManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="terminated">Terminated</SelectItem>
+                      <SelectItem value="active" data-testid={`option-active-${member.id}`}>Active</SelectItem>
+                      <SelectItem value="inactive" data-testid={`option-inactive-${member.id}`}>Inactive</SelectItem>
+                      <SelectItem value="terminated" data-testid={`option-terminated-${member.id}`}>Terminated</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

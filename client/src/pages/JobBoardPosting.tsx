@@ -28,12 +28,7 @@ export default function JobBoardPosting() {
   });
 
   const { data: postings, isLoading } = useQuery({
-    queryKey: ["/api/employer/jobs", jobId, "postings"],
-    queryFn: async () => {
-      const res = await fetch(`/api/employer/jobs/${jobId}/postings`);
-      if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
-    },
+    queryKey: [`/api/employer/jobs/${jobId}/postings`],
   });
 
   const createPostingMutation = useMutation({
