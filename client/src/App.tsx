@@ -18,6 +18,10 @@ import EmployerDashboard from "@/pages/EmployerDashboard";
 import CreateJob from "@/pages/CreateJob";
 import JobApplicants from "@/pages/JobApplicants";
 import WorkerDashboard from "@/pages/WorkerDashboard";
+import StaffManagement from "@/pages/StaffManagement";
+import TaskScheduling from "@/pages/TaskScheduling";
+import FinancialTracking from "@/pages/FinancialTracking";
+import JobBoardPosting from "@/pages/JobBoardPosting";
 
 function ProtectedRoute({ component: Component, allowedRoles }: { component: React.ComponentType, allowedRoles?: string[] }) {
   const { data: user, isLoading } = useUser();
@@ -63,6 +67,18 @@ function Router() {
         </Route>
         <Route path="/employer/jobs/:id/applicants">
           <ProtectedRoute component={JobApplicants} allowedRoles={['employer']} />
+        </Route>
+        <Route path="/employer/jobs/:id/posting">
+          <ProtectedRoute component={JobBoardPosting} allowedRoles={['employer']} />
+        </Route>
+        <Route path="/employer/staff">
+          <ProtectedRoute component={StaffManagement} allowedRoles={['employer']} />
+        </Route>
+        <Route path="/employer/tasks">
+          <ProtectedRoute component={TaskScheduling} allowedRoles={['employer']} />
+        </Route>
+        <Route path="/employer/finances">
+          <ProtectedRoute component={FinancialTracking} allowedRoles={['employer']} />
         </Route>
 
         {/* Worker Routes */}

@@ -1,13 +1,19 @@
 import { db } from "./db";
 import { 
   users, employerProfiles, workerProfiles, jobs, applications,
+  staff, employmentHistory, tasks, transactions, jobBoardPostings,
   type User, type InsertUser,
   type EmployerProfile, type InsertEmployerProfile,
   type WorkerProfile, type InsertWorkerProfile,
   type Job, type InsertJob,
-  type Application, type InsertApplication
+  type Application, type InsertApplication,
+  type Staff, type InsertStaff,
+  type EmploymentHistoryRecord, type InsertEmploymentHistory,
+  type Task, type InsertTask,
+  type Transaction, type InsertTransaction,
+  type JobBoardPosting, type InsertJobBoardPosting
 } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export interface IStorage {
   // User & Auth
@@ -134,6 +140,107 @@ export class DatabaseStorage implements IStorage {
       .where(eq(applications.id, id))
       .returning();
     return updated;
+  }
+
+  // === Staff ===
+  async getStaffByEmployer(employerId: number): Promise<Staff[]> {
+    return await db.select().from(staff).where(eq(staff.employerId, employerId));
+  }
+
+  async getStaff(id: number): Promise<Staff | undefined> {
+    const [s] = await db.select().from(staff).where(eq(staff.id, id));
+    return s;
+  }
+
+  async createStaff(s: InsertStaff): Promise<Staff> {
+    const [newStaff] = await db.insert(staff).values(s).returning();
+    // Add employment history entry
+    await db.insert(employmentHistory).values({
+      staffId: newStaff.id,
+      action: "hired",
+      description: `Hired as ${s.position}`,
+    });
+    return newStaff;
+  }
+
+  async updateStaff(id: number, updates: Partial<InsertStaff>): Promise<Staff> {
+    const [updated] = await db.update(staff).set(updates).where(eq(staff.id, id)).returning();
+    return updated;
+  }
+
+  async getEmploymentHistory(staffId: number): Promise<EmploymentHistoryRecord[]> {
+    return await db.select().from(employmentHistory).where(eq(employmentHistory.staffId, staffId)).orderBy(desc(employmentHistory.date));
+  }
+
+  async addEmploymentHistory(h: InsertEmploymentHistory): Promise<EmploymentHistoryRecord> {
+    const [record] = await db.insert(employmentHistory).values(h).returning();
+    return record;
+  }
+
+  // === Tasks ===
+  async getTasksByEmployer(employerId: number): Promise<Task[]> {
+    return await db.select().from(tasks).where(eq(tasks.employerId, employerId)).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTask(id: number): Promise<Task | undefined> {
+    const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
+    return t;
+  }
+
+  async createTask(t: InsertTask): Promise<Task> {
+    const [newTask] = await db.insert(tasks).values(t).returning();
+    return newTask;
+  }
+
+  async updateTask(id: number, updates: Partial<InsertTask>): Promise<Task> {
+    const [updated] = await db.update(tasks).set(updates).where(eq(tasks.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTask(id: number): Promise<void> {
+    await db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  // === Transactions ===
+  async getTransactionsByEmployer(employerId: number, filters?: { type?: string; startDate?: Date; endDate?: Date }): Promise<Transaction[]> {
+    const conditions = [eq(transactions.employerId, employerId)];
+    if (filters?.type) conditions.push(eq(transactions.type, filters.type));
+    if (filters?.startDate) conditions.push(gte(transactions.date, filters.startDate));
+    if (filters?.endDate) conditions.push(lte(transactions.date, filters.endDate));
+    
+    return await db.select().from(transactions).where(and(...conditions)).orderBy(desc(transactions.date));
+  }
+
+  async createTransaction(t: InsertTransaction): Promise<Transaction> {
+    const [newTx] = await db.insert(transactions).values(t).returning();
+    return newTx;
+  }
+
+  async getFinancialSummary(employerId: number): Promise<{ totalRevenue: number; totalExpenses: number; netIncome: number }> {
+    const allTx = await db.select().from(transactions).where(eq(transactions.employerId, employerId));
+    const totalRevenue = allTx.filter(t => t.type === "revenue").reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = allTx.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+    return { totalRevenue, totalExpenses, netIncome: totalRevenue - totalExpenses };
+  }
+
+  // === Job Board Postings ===
+  async getJobBoardPostings(jobId: number): Promise<JobBoardPosting[]> {
+    return await db.select().from(jobBoardPostings).where(eq(jobBoardPostings.jobId, jobId));
+  }
+
+  async createJobBoardPosting(p: InsertJobBoardPosting): Promise<JobBoardPosting> {
+    const [newPosting] = await db.insert(jobBoardPostings).values(p).returning();
+    return newPosting;
+  }
+
+  async updateJobBoardPosting(id: number, updates: Partial<InsertJobBoardPosting>): Promise<JobBoardPosting> {
+    const [updated] = await db.update(jobBoardPostings).set(updates).where(eq(jobBoardPostings.id, id)).returning();
+    return updated;
+  }
+
+  async getJobBoardPosting(id: number): Promise<JobBoardPosting | undefined> {
+    const [p] = await db.select().from(jobBoardPostings).where(eq(jobBoardPostings.id, id));
+    return p;
   }
 }
 

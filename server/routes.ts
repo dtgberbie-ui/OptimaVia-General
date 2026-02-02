@@ -92,6 +92,177 @@ export async function registerRoutes(
     }
   });
 
+  // === STAFF MANAGEMENT ===
+
+  app.get(api.employer.listStaff.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const staffList = await storage.getStaffByEmployer((req.user as any).id);
+    
+    // Enrich with worker profiles
+    const enrichedStaff = await Promise.all(staffList.map(async (s) => {
+      const workerProfile = await storage.getWorkerProfile(s.workerId);
+      return { ...s, workerProfile: workerProfile || null };
+    }));
+    
+    res.json(enrichedStaff);
+  });
+
+  app.get(api.employer.getStaff.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const s = await storage.getStaff(Number(req.params.id));
+    if (!s || s.employerId !== (req.user as any).id) return res.status(404).send("Not found");
+    
+    const workerProfile = await storage.getWorkerProfile(s.workerId);
+    const history = await storage.getEmploymentHistory(s.id);
+    
+    res.json({ ...s, workerProfile, history });
+  });
+
+  app.post(api.employer.createStaff.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.createStaff.input.parse(req.body);
+      const newStaff = await storage.createStaff({ ...input, employerId: (req.user as any).id });
+      res.status(201).json(newStaff);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.patch(api.employer.updateStaff.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.updateStaff.input.parse(req.body);
+      const updated = await storage.updateStaff(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  // === TASKS ===
+
+  app.get(api.employer.listTasks.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const taskList = await storage.getTasksByEmployer((req.user as any).id);
+    
+    // Enrich with assignee
+    const enrichedTasks = await Promise.all(taskList.map(async (t) => {
+      if (t.staffId) {
+        const assignee = await storage.getStaff(t.staffId);
+        const profile = assignee ? await storage.getWorkerProfile(assignee.workerId) : null;
+        return { ...t, assignee: assignee ? { ...assignee, workerProfile: profile } : null };
+      }
+      return { ...t, assignee: null };
+    }));
+    
+    res.json(enrichedTasks);
+  });
+
+  app.post(api.employer.createTask.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.createTask.input.parse(req.body);
+      const newTask = await storage.createTask({ ...input, employerId: (req.user as any).id });
+      res.status(201).json(newTask);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.patch(api.employer.updateTask.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.updateTask.input.parse(req.body);
+      const updated = await storage.updateTask(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.delete(api.employer.deleteTask.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    await storage.deleteTask(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // === FINANCIAL TRACKING ===
+
+  app.get(api.employer.listTransactions.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const { type, startDate, endDate } = req.query as any;
+    const filters = {
+      type,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+    };
+    const txList = await storage.getTransactionsByEmployer((req.user as any).id, filters);
+    res.json(txList);
+  });
+
+  app.post(api.employer.createTransaction.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.createTransaction.input.parse(req.body);
+      const newTx = await storage.createTransaction({ ...input, employerId: (req.user as any).id });
+      res.status(201).json(newTx);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.get(api.employer.getFinancialSummary.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const summary = await storage.getFinancialSummary((req.user as any).id);
+    res.json(summary);
+  });
+
+  // === JOB BOARD POSTINGS ===
+
+  app.get(api.employer.listJobPostings.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const postings = await storage.getJobBoardPostings(Number(req.params.jobId));
+    res.json(postings);
+  });
+
+  app.post(api.employer.createJobPosting.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.createJobPosting.input.parse(req.body);
+      const newPosting = await storage.createJobBoardPosting({ ...input, jobId: Number(req.params.jobId) });
+      res.status(201).json(newPosting);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.post(api.employer.postToJobBoard.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const posting = await storage.getJobBoardPosting(Number(req.params.id));
+      if (!posting) return res.status(404).send("Not found");
+
+      // Simulate posting to external job board (Indeed, etc.)
+      // In production, this would call the Indeed API with the employer's credentials
+      const externalId = `EXT-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      
+      await storage.updateJobBoardPosting(posting.id, {
+        status: "posted",
+        externalId,
+        postedAt: new Date(),
+      } as any);
+
+      res.json({ 
+        success: true, 
+        externalId, 
+        message: `Successfully posted to ${posting.platform}. External ID: ${externalId}` 
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to post to job board" });
+    }
+  });
+
   // === WORKER ROUTES ===
 
   app.post(api.worker.createProfile.path, async (req, res) => {

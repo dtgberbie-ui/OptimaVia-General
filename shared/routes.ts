@@ -5,11 +5,19 @@ import {
   insertWorkerProfileSchema, 
   insertJobSchema,
   insertApplicationSchema,
+  insertStaffSchema,
+  insertTaskSchema,
+  insertTransactionSchema,
+  insertJobBoardPostingSchema,
   jobs,
   applications,
   employerProfiles,
   workerProfiles,
-  users
+  users,
+  staff,
+  tasks,
+  transactions,
+  jobBoardPostings
 } from './schema';
 
 // ============================================
@@ -116,6 +124,132 @@ export const api = {
       input: z.object({ status: z.string(), notes: z.string().optional() }),
       responses: {
         200: z.custom<typeof applications.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    // Staff Management
+    listStaff: {
+      method: 'GET' as const,
+      path: '/api/employer/staff',
+      responses: {
+        200: z.array(z.custom<typeof staff.$inferSelect>()),
+      },
+    },
+    getStaff: {
+      method: 'GET' as const,
+      path: '/api/employer/staff/:id',
+      responses: {
+        200: z.custom<typeof staff.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    createStaff: {
+      method: 'POST' as const,
+      path: '/api/employer/staff',
+      input: insertStaffSchema.omit({ employerId: true }),
+      responses: {
+        201: z.custom<typeof staff.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    updateStaff: {
+      method: 'PATCH' as const,
+      path: '/api/employer/staff/:id',
+      input: insertStaffSchema.partial(),
+      responses: {
+        200: z.custom<typeof staff.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    // Tasks
+    listTasks: {
+      method: 'GET' as const,
+      path: '/api/employer/tasks',
+      responses: {
+        200: z.array(z.custom<typeof tasks.$inferSelect>()),
+      },
+    },
+    createTask: {
+      method: 'POST' as const,
+      path: '/api/employer/tasks',
+      input: insertTaskSchema.omit({ employerId: true }),
+      responses: {
+        201: z.custom<typeof tasks.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    updateTask: {
+      method: 'PATCH' as const,
+      path: '/api/employer/tasks/:id',
+      input: insertTaskSchema.partial(),
+      responses: {
+        200: z.custom<typeof tasks.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    deleteTask: {
+      method: 'DELETE' as const,
+      path: '/api/employer/tasks/:id',
+      responses: {
+        204: z.void(),
+        404: errorSchemas.notFound,
+      },
+    },
+    // Financial Tracking
+    listTransactions: {
+      method: 'GET' as const,
+      path: '/api/employer/transactions',
+      input: z.object({
+        type: z.enum(['revenue', 'expense']).optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      }).optional(),
+      responses: {
+        200: z.array(z.custom<typeof transactions.$inferSelect>()),
+      },
+    },
+    createTransaction: {
+      method: 'POST' as const,
+      path: '/api/employer/transactions',
+      input: insertTransactionSchema.omit({ employerId: true }),
+      responses: {
+        201: z.custom<typeof transactions.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    getFinancialSummary: {
+      method: 'GET' as const,
+      path: '/api/employer/financial-summary',
+      responses: {
+        200: z.object({
+          totalRevenue: z.number(),
+          totalExpenses: z.number(),
+          netIncome: z.number(),
+        }),
+      },
+    },
+    // Job Board Postings
+    listJobPostings: {
+      method: 'GET' as const,
+      path: '/api/employer/jobs/:jobId/postings',
+      responses: {
+        200: z.array(z.custom<typeof jobBoardPostings.$inferSelect>()),
+      },
+    },
+    createJobPosting: {
+      method: 'POST' as const,
+      path: '/api/employer/jobs/:jobId/postings',
+      input: insertJobBoardPostingSchema.omit({ jobId: true }),
+      responses: {
+        201: z.custom<typeof jobBoardPostings.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    postToJobBoard: {
+      method: 'POST' as const,
+      path: '/api/employer/postings/:id/publish',
+      responses: {
+        200: z.object({ success: z.boolean(), externalId: z.string().optional(), message: z.string() }),
         404: errorSchemas.notFound,
       },
     },
