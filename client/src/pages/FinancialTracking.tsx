@@ -201,8 +201,8 @@ export default function FinancialTracking() {
                   data-testid={`tx-row-${tx.id}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${tx.type === 'revenue' ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}`}>
-                      {tx.type === 'revenue' ? (
+                    <div className={`p-2 rounded-full ${tx.type?.toLowerCase() === 'revenue' ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}`}>
+                      {tx.type?.toLowerCase() === 'revenue' ? (
                         <ArrowUpRight className="h-4 w-4 text-green-600" />
                       ) : (
                         <ArrowDownRight className="h-4 w-4 text-red-600" />
@@ -215,8 +215,8 @@ export default function FinancialTracking() {
                       </p>
                     </div>
                   </div>
-                  <div className={`font-bold ${tx.type === 'revenue' ? 'text-green-600' : 'text-red-600'}`}>
-                    {tx.type === 'revenue' ? '+' : '-'}{formatCurrency(tx.amount)}
+                  <div className={`font-bold ${tx.type?.toLowerCase() === 'revenue' ? 'text-green-600' : 'text-red-600'}`}>
+                    {tx.type?.toLowerCase() === 'revenue' ? '+' : '-'}{formatCurrency(tx.amount)}
                   </div>
                 </div>
               ))}

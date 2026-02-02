@@ -244,8 +244,8 @@ export class DatabaseStorage implements IStorage {
 
   async getFinancialSummary(employerId: number): Promise<{ totalRevenue: number; totalExpenses: number; netIncome: number }> {
     const allTx = await db.select().from(transactions).where(eq(transactions.employerId, employerId));
-    const totalRevenue = allTx.filter(t => t.type === "revenue").reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = allTx.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+    const totalRevenue = allTx.filter(t => t.type.toLowerCase() === "revenue").reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = allTx.filter(t => t.type.toLowerCase() === "expense").reduce((sum, t) => sum + t.amount, 0);
     return { totalRevenue, totalExpenses, netIncome: totalRevenue - totalExpenses };
   }
 
