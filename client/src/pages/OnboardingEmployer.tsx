@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
 
 const INDUSTRIES = [
   "Home Care",
@@ -32,6 +33,8 @@ const INDUSTRIES = [
 
 export default function OnboardingEmployer() {
   const createProfileMutation = useCreateEmployerProfile();
+  const [showCustomIndustry, setShowCustomIndustry] = useState(false);
+  const [customIndustry, setCustomIndustry] = useState("");
   
   const form = useForm({
     resolver: zodResolver(insertEmployerProfileSchema.omit({ userId: true })),
@@ -42,7 +45,13 @@ export default function OnboardingEmployer() {
     },
   });
 
-  const onSubmit = (data: any) => createProfileMutation.mutate(data);
+  const onSubmit = (data: any) => {
+    const finalData = {
+      ...data,
+      industry: showCustomIndustry && customIndustry.trim() ? customIndustry.trim() : data.industry,
+    };
+    createProfileMutation.mutate(finalData);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -73,7 +82,14 @@ export default function OnboardingEmployer() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Industry</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        setShowCustomIndustry(value === "Other");
+                        if (value !== "Other") setCustomIndustry("");
+                      }}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-industry">
                           <SelectValue placeholder="Select your industry" />
@@ -87,6 +103,15 @@ export default function OnboardingEmployer() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {showCustomIndustry && (
+                      <Input
+                        placeholder="Please specify your industry"
+                        value={customIndustry}
+                        onChange={(e) => setCustomIndustry(e.target.value)}
+                        className="mt-2"
+                        data-testid="input-custom-industry"
+                      />
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
