@@ -18,6 +18,7 @@ export const employerProfiles = pgTable("employer_profiles", {
   userId: integer("user_id").notNull().unique(), // FK to users
   companyName: text("company_name").notNull(),
   industry: text("industry").notNull(),
+  country: text("country").notNull().default(""),
   location: text("location").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Country, State } from "country-state-city";
 
 const INDUSTRIES = [
   "Home Care",
@@ -35,12 +36,23 @@ export default function OnboardingEmployer() {
   const createProfileMutation = useCreateEmployerProfile();
   const [showCustomIndustry, setShowCustomIndustry] = useState(false);
   const [customIndustry, setCustomIndustry] = useState("");
-  
+  const [selectedCountryCode, setSelectedCountryCode] = useState("");
+
+  const allCountries = useMemo(() => Country.getAllCountries(), []);
+
+  const statesForCountry = useMemo(() => {
+    if (!selectedCountryCode) return [];
+    return State.getStatesOfCountry(selectedCountryCode);
+  }, [selectedCountryCode]);
+
+  const hasStates = statesForCountry.length > 0;
+
   const form = useForm({
     resolver: zodResolver(insertEmployerProfileSchema.omit({ userId: true })),
     defaultValues: {
       companyName: "",
       industry: "",
+      country: "",
       location: "",
     },
   });
@@ -70,7 +82,7 @@ export default function OnboardingEmployer() {
                   <FormItem>
                     <FormLabel>Company Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Acme Logistics Inc." {...field} />
+                      <Input placeholder="Acme Logistics Inc." {...field} data-testid="input-company-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -118,18 +130,74 @@ export default function OnboardingEmployer() {
               />
               <FormField
                 control={form.control}
-                name="location"
+                name="country"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Headquarters Location</FormLabel>
-                    <FormControl>
-                      <Input placeholder="City, State" {...field} />
-                    </FormControl>
+                    <FormLabel>Country</FormLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        const countryObj = allCountries.find(c => c.name === value);
+                        setSelectedCountryCode(countryObj?.isoCode || "");
+                        form.setValue("location", "");
+                      }}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-country">
+                          <SelectValue placeholder="Select your country" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allCountries.map((c) => (
+                          <SelectItem key={c.isoCode} value={c.name}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={createProfileMutation.isPending}>
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State / Province / Region</FormLabel>
+                    {hasStates ? (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-location">
+                            <SelectValue placeholder="Select your state/province/region" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {statesForCountry.map((s) => (
+                            <SelectItem key={s.isoCode} value={s.name}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <FormControl>
+                        <Input
+                          placeholder={selectedCountryCode ? "Enter your state/province/region" : "Select a country first"}
+                          {...field}
+                          data-testid="input-location"
+                        />
+                      </FormControl>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={createProfileMutation.isPending} data-testid="button-complete-profile">
                 {createProfileMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Complete Profile"}
               </Button>
             </form>
