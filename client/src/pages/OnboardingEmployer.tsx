@@ -21,6 +21,8 @@ const INDUSTRIES = [
   "Hospitality",
   "Cleaning & Janitorial",
   "Landscaping",
+  "Personal Care & Beauty Services",
+  "Automotive & Equipment Repair Services",
   "Retail",
   "Staffing & Recruiting",
   "Transportation",
