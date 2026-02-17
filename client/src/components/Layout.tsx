@@ -90,7 +90,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       <footer className="border-t bg-muted/30 py-12">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} OptimaVia. Making workforce reliability standard.</p>
+          <p>&copy; {new Date().getFullYear()} OptimaVia. Making Work Seamless</p>
         </div>
       </footer>
     </div>
