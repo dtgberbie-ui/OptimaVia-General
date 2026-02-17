@@ -5,8 +5,28 @@ import { useCreateEmployerProfile } from "@/hooks/use-onboarding";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2 } from "lucide-react";
+
+const INDUSTRIES = [
+  "Home Care",
+  "Trucking & Logistics",
+  "Manufacturing",
+  "Construction",
+  "Healthcare",
+  "Warehousing & Distribution",
+  "Agriculture",
+  "Food & Beverage",
+  "Hospitality",
+  "Cleaning & Janitorial",
+  "Landscaping",
+  "Retail",
+  "Staffing & Recruiting",
+  "Transportation",
+  "Energy & Utilities",
+  "Other",
+];
 
 export default function OnboardingEmployer() {
   const createProfileMutation = useCreateEmployerProfile();
@@ -51,9 +71,20 @@ export default function OnboardingEmployer() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Industry</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Transportation, Healthcare, Construction" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-industry">
+                          <SelectValue placeholder="Select your industry" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {INDUSTRIES.map((industry) => (
+                          <SelectItem key={industry} value={industry} data-testid={`option-industry-${industry.toLowerCase().replace(/\s+/g, '-')}`}>
+                            {industry}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
