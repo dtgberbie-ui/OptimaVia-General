@@ -1,14 +1,22 @@
 import { useMyJobs } from "@/hooks/use-jobs";
+import type { Job } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Link } from "wouter";
 import { JobCard } from "@/components/JobCard";
-import { Plus, Loader2, Users, Calendar, DollarSign, Globe } from "lucide-react";
+import { Plus, Loader2, Users, Calendar, DollarSign, Briefcase } from "lucide-react";
 
 export default function EmployerDashboard() {
   const { data: jobs, isLoading } = useMyJobs();
 
   const quickActions = [
+    { 
+      title: "Hiring", 
+      description: "Jobs, applicants & distribution", 
+      icon: Briefcase, 
+      href: "/employer/hiring",
+      color: "text-indigo-500"
+    },
     { 
       title: "Staff Management", 
       description: "Manage team & performance", 
@@ -36,8 +44,8 @@ export default function EmployerDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-display font-bold">Employer Dashboard</h1>
-          <p className="text-muted-foreground">Manage your active listings and applicants.</p>
+          <h1 className="text-3xl font-display font-bold" data-testid="text-employer-dashboard-title">Employer Dashboard</h1>
+          <p className="text-muted-foreground">Manage your business operations.</p>
         </div>
         <Link href="/employer/jobs/new">
           <Button className="gap-2" data-testid="button-post-job">
@@ -47,8 +55,7 @@ export default function EmployerDashboard() {
         </Link>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
+      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {quickActions.map((action) => (
           <Link key={action.href} href={action.href}>
             <Card className="hover-elevate cursor-pointer h-full" data-testid={`link-${action.title.toLowerCase().replace(/\s/g, '-')}`}>
@@ -64,20 +71,19 @@ export default function EmployerDashboard() {
         ))}
       </div>
 
-      {/* Jobs Section */}
       <h2 className="text-xl font-semibold mb-4">Your Job Listings</h2>
       {isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>
       ) : jobs?.length === 0 ? (
         <div className="text-center py-20 bg-slate-50 dark:bg-slate-900 rounded-xl border border-dashed">
-          <h3 className="text-lg font-medium mb-2">No jobs posted yet</h3>
+          <h3 className="text-lg font-medium mb-2" data-testid="text-no-jobs">No jobs posted yet</h3>
           <Link href="/employer/jobs/new">
             <Button variant="outline">Create your first job post</Button>
           </Link>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {jobs?.map(job => (
+          {(jobs as Job[])?.map((job: Job) => (
             <JobCard key={job.id} job={job} isEmployer />
           ))}
         </div>

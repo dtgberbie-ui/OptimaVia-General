@@ -15,13 +15,14 @@ import OnboardingWorker from "@/pages/OnboardingWorker";
 import JobsList from "@/pages/JobsList";
 import JobDetail from "@/pages/JobDetail";
 import EmployerDashboard from "@/pages/EmployerDashboard";
+import HiringDashboard from "@/pages/HiringDashboard";
 import CreateJob from "@/pages/CreateJob";
 import JobApplicants from "@/pages/JobApplicants";
+import DistributeJob from "@/pages/DistributeJob";
 import WorkerDashboard from "@/pages/WorkerDashboard";
 import StaffManagement from "@/pages/StaffManagement";
 import TaskScheduling from "@/pages/TaskScheduling";
 import FinancialTracking from "@/pages/FinancialTracking";
-import JobBoardPosting from "@/pages/JobBoardPosting";
 
 function ProtectedRoute({ component: Component, allowedRoles }: { component: React.ComponentType, allowedRoles?: string[] }) {
   const { data: user, isLoading } = useUser();
@@ -50,7 +51,6 @@ function Router() {
         <Route path="/jobs" component={JobsList} />
         <Route path="/jobs/:id" component={JobDetail} />
         
-        {/* Onboarding */}
         <Route path="/onboarding/employer">
           <ProtectedRoute component={OnboardingEmployer} allowedRoles={['employer']} />
         </Route>
@@ -58,9 +58,11 @@ function Router() {
           <ProtectedRoute component={OnboardingWorker} allowedRoles={['worker']} />
         </Route>
 
-        {/* Employer Routes */}
         <Route path="/employer/dashboard">
           <ProtectedRoute component={EmployerDashboard} allowedRoles={['employer']} />
+        </Route>
+        <Route path="/employer/hiring">
+          <ProtectedRoute component={HiringDashboard} allowedRoles={['employer']} />
         </Route>
         <Route path="/employer/jobs/new">
           <ProtectedRoute component={CreateJob} allowedRoles={['employer']} />
@@ -68,8 +70,8 @@ function Router() {
         <Route path="/employer/jobs/:id/applicants">
           <ProtectedRoute component={JobApplicants} allowedRoles={['employer']} />
         </Route>
-        <Route path="/employer/jobs/:id/posting">
-          <ProtectedRoute component={JobBoardPosting} allowedRoles={['employer']} />
+        <Route path="/employer/jobs/:id/distribute">
+          <ProtectedRoute component={DistributeJob} allowedRoles={['employer']} />
         </Route>
         <Route path="/employer/staff">
           <ProtectedRoute component={StaffManagement} allowedRoles={['employer']} />
@@ -81,7 +83,6 @@ function Router() {
           <ProtectedRoute component={FinancialTracking} allowedRoles={['employer']} />
         </Route>
 
-        {/* Worker Routes */}
         <Route path="/worker/dashboard">
           <ProtectedRoute component={WorkerDashboard} allowedRoles={['worker']} />
         </Route>

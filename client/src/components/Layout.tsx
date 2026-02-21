@@ -30,11 +30,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 {isEmployer && (
                   <>
-                    <Link href="/employer/dashboard" className={`hover:text-primary transition-colors ${location.startsWith("/employer") ? "text-primary font-semibold" : ""}`}>
+                    <Link href="/employer/dashboard" className={`hover:text-primary transition-colors ${location === "/employer/dashboard" ? "text-primary font-semibold" : ""}`}>
                       Dashboard
                     </Link>
-                    <Link href="/employer/jobs/new" className={`hover:text-primary transition-colors ${location === "/employer/jobs/new" ? "text-primary font-semibold" : ""}`}>
-                      Post a Job
+                    <Link href="/employer/hiring" className={`hover:text-primary transition-colors ${location.startsWith("/employer/hiring") || location.startsWith("/employer/jobs") ? "text-primary font-semibold" : ""}`}>
+                      Hiring
                     </Link>
                   </>
                 )}

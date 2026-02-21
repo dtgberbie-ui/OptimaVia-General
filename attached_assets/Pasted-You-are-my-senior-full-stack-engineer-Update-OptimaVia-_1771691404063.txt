@@ -1,0 +1,98 @@
+You are my senior full-stack engineer. Update OptimaVia from a standalone job board into a comprehensive business management app, and ADD a “Job Board Integrations” feature for the Hiring module.
+
+GOAL:
+Allow employers to publish a single job posting inside OptimaVia and distribute it to external job boards where feasible. Because some job boards (e.g., LinkedIn, Indeed) require partner approval or have limited APIs, implement a tiered approach:
+
+INTEGRATION LEVELS (must implement all three):
+1) DIRECT API (only where possible):
+   - Support a pluggable architecture for job boards that can accept API-based posting.
+   - Use env vars for API keys/secrets.
+   - If an API is not available, do NOT fake it. Show “Requires Partner Access” and disable.
+2) XML FEED / ATS-STYLE SYNDICATION:
+   - Generate an ATS-style job feed (XML) and a public URL for it.
+   - Many boards/aggregators can ingest feeds; this is often the practical MVP.
+   - Include fields: job_id, title, description, location, country, region/state, city, employment_type, salary range, apply_url, company_name, posted_date, updated_date, category/industry.
+3) MANUAL POSTING ASSIST (universal fallback):
+   - Provide “Copy job posting” + “Copy apply link” buttons.
+   - Provide an “AI rewrite for job board” tool to tailor the description (if OpenAI key present; otherwise template).
+   - Provide a checklist per board with outbound links and steps.
+
+UI REQUIREMENTS:
+Create a new “Hiring” section in the employer dashboard with these pages:
+
+A) Hiring Dashboard
+   - Overview cards: Open Jobs, Applicants, Integrations Connected, Syndication Status
+   - Button: “Post a Job”
+
+B) Job Posting Editor (OptimaVia-native)
+   - Standard fields: title, industry, department (optional), employment type, location (country + region/state + city),
+     pay range, description, responsibilities, requirements, required certifications, schedule, benefits.
+   - Save as Draft / Publish.
+
+C) Distribute Job (New page)
+   - After publishing, show a “Distribution” panel with:
+     - Toggle: Include in OptimaVia job board (ON by default)
+     - Section: “Syndication Feed” with:
+        - Feed URL (copy button)
+        - Last generated timestamp
+        - Preview of XML
+     - Section: “Direct Integrations” with tiles:
+        - Indeed (status: Requires Partner Access by default)
+        - LinkedIn (status: Requires Partner Access by default)
+        - Glassdoor (status: If no API, show Not Supported / Manual)
+        - Handshake (status: Usually requires institutional approvals; show Requires Partner Access)
+     - Section: “Manual Posting Assistant”:
+        - Buttons: Copy job text, Copy apply link, Generate board-specific version
+        - Dropdown: select board (Indeed, LinkedIn, Glassdoor, Handshake, Other)
+        - Show tailored text + checklist steps
+
+FUNCTIONAL REQUIREMENTS:
+1) Data model changes:
+   - Add JobDistribution table:
+     - id, jobId, channel (OPTIMAVIA|FEED|INDEED|LINKEDIN|GLASSDOOR|HANDSHAKE|OTHER),
+       status (DRAFT|READY|PUBLISHED|FAILED|REQUIRES_ACCESS),
+       externalPostingId (nullable), lastAttemptAt, lastError (nullable)
+   - Add IntegrationCredential table:
+     - id, employerId, provider, status (CONNECTED|NOT_CONNECTED|REQUIRES_ACCESS),
+       metadata JSON (store non-secret info)
+   - Store secrets only in environment variables, not DB.
+
+2) Syndication feed:
+   - Implement /api/jobs/feed.xml that returns the XML feed for public jobs.
+   - Include an apply_url that routes to OptimaVia’s job application page.
+   - Add filtering: allow employer-specific feed via tokenized URL:
+     /api/jobs/{employerId}/feed.xml?token=...
+   - Add a basic admin setting for enabling/disabling feed per employer.
+
+3) Direct API connectors:
+   - Implement provider stubs with a consistent interface:
+     - validateCredentials()
+     - publishJob(job)
+     - updateJob(job)
+     - closeJob(job)
+   - Default providers should be stubs showing “Requires Partner Access” unless you can confirm a usable API without approval.
+   - If credentials exist and provider supports posting, implement actual publish/update/close.
+
+4) Tracking:
+   - On Distribution page show per-channel status and timestamps.
+   - Track clicks to apply_url (simple analytics table: jobId, source, timestamp).
+
+AI HELPER (optional):
+If OPENAI_API_KEY is present:
+- Provide a “Rewrite for {board}” function that:
+  - keeps truthfulness; no invented benefits/pay
+  - shortens and formats for the selected board
+Else:
+- Use deterministic templates.
+
+IMPORTANT CONSTRAINTS:
+- Do not claim to integrate with Indeed/LinkedIn/Handshake via API unless the integration is technically feasible without partner approval.
+- Provide honest status messaging in the UI: “Requires partner access” or “Manual posting only.”
+- Keep the code modular so real integrations can be added later.
+
+DELIVERABLES:
+- Updated UI pages and routes
+- New database models and migrations
+- Feed endpoint with a working XML output
+- Manual posting assistant working end-to-end
+- README updates explaining integration levels and how to add provider credentials

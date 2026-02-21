@@ -2,6 +2,7 @@ import { db } from "./db";
 import { 
   users, employerProfiles, workerProfiles, jobs, applications,
   staff, employmentHistory, tasks, transactions, jobBoardPostings,
+  jobDistributions, integrationCredentials, applicationClicks,
   type User, type InsertUser,
   type EmployerProfile, type InsertEmployerProfile,
   type WorkerProfile, type InsertWorkerProfile,
@@ -11,36 +12,39 @@ import {
   type EmploymentHistoryRecord, type InsertEmploymentHistory,
   type Task, type InsertTask,
   type Transaction, type InsertTransaction,
-  type JobBoardPosting, type InsertJobBoardPosting
+  type JobBoardPosting, type InsertJobBoardPosting,
+  type JobDistribution, type InsertJobDistribution,
+  type IntegrationCredential, type InsertIntegrationCredential,
+  type ApplicationClick, type InsertApplicationClick
 } from "@shared/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // User & Auth
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser & { role: string }): Promise<User>;
 
-  // Profiles
   getEmployerProfile(userId: number): Promise<EmployerProfile | undefined>;
   createEmployerProfile(profile: InsertEmployerProfile): Promise<EmployerProfile>;
+  updateEmployerProfile(userId: number, updates: Partial<InsertEmployerProfile>): Promise<EmployerProfile>;
   
   getWorkerProfile(userId: number): Promise<WorkerProfile | undefined>;
   createWorkerProfile(profile: InsertWorkerProfile): Promise<WorkerProfile>;
 
-  // Jobs
   createJob(job: InsertJob): Promise<Job>;
   getJob(id: number): Promise<Job | undefined>;
   getJobs(filters?: { industry?: string; location?: string }): Promise<Job[]>;
   getJobsByEmployer(employerId: number): Promise<Job[]>;
+  getPublishedJobs(): Promise<Job[]>;
+  getPublishedJobsByEmployer(employerId: number): Promise<Job[]>;
+  updateJob(id: number, updates: Partial<InsertJob>): Promise<Job>;
 
-  // Applications
   createApplication(app: InsertApplication): Promise<Application>;
   getApplicationsByJob(jobId: number): Promise<Application[]>;
   getApplicationsByWorker(workerId: number): Promise<Application[]>;
+  getApplicationsByEmployer(employerId: number): Promise<Application[]>;
   updateApplicationStatus(id: number, status: string, notes?: string): Promise<Application>;
 
-  // Staff
   getStaffByEmployer(employerId: number): Promise<Staff[]>;
   getStaff(id: number): Promise<Staff | undefined>;
   createStaff(s: InsertStaff): Promise<Staff>;
@@ -48,27 +52,33 @@ export interface IStorage {
   getEmploymentHistory(staffId: number): Promise<EmploymentHistoryRecord[]>;
   addEmploymentHistory(h: InsertEmploymentHistory): Promise<EmploymentHistoryRecord>;
 
-  // Tasks
   getTasksByEmployer(employerId: number): Promise<Task[]>;
   getTask(id: number): Promise<Task | undefined>;
   createTask(t: InsertTask): Promise<Task>;
   updateTask(id: number, updates: Partial<InsertTask>): Promise<Task>;
   deleteTask(id: number): Promise<void>;
 
-  // Transactions
   getTransactionsByEmployer(employerId: number, filters?: { type?: string; startDate?: Date; endDate?: Date }): Promise<Transaction[]>;
   createTransaction(t: InsertTransaction): Promise<Transaction>;
   getFinancialSummary(employerId: number): Promise<{ totalRevenue: number; totalExpenses: number; netIncome: number }>;
 
-  // Job Board Postings
   getJobBoardPostings(jobId: number): Promise<JobBoardPosting[]>;
   createJobBoardPosting(p: InsertJobBoardPosting): Promise<JobBoardPosting>;
   updateJobBoardPosting(id: number, updates: Partial<InsertJobBoardPosting>): Promise<JobBoardPosting>;
   getJobBoardPosting(id: number): Promise<JobBoardPosting | undefined>;
+
+  getDistributionsByJob(jobId: number): Promise<JobDistribution[]>;
+  createDistribution(d: InsertJobDistribution): Promise<JobDistribution>;
+  updateDistribution(id: number, updates: Partial<InsertJobDistribution>): Promise<JobDistribution>;
+
+  getIntegrationsByEmployer(employerId: number): Promise<IntegrationCredential[]>;
+  createIntegrationCredential(c: InsertIntegrationCredential): Promise<IntegrationCredential>;
+
+  recordClick(click: InsertApplicationClick): Promise<ApplicationClick>;
+  getClicksByJob(jobId: number): Promise<ApplicationClick[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-  // === User ===
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -84,7 +94,6 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // === Profiles ===
   async getEmployerProfile(userId: number): Promise<EmployerProfile | undefined> {
     const [profile] = await db.select().from(employerProfiles).where(eq(employerProfiles.userId, userId));
     return profile;
@@ -93,6 +102,11 @@ export class DatabaseStorage implements IStorage {
   async createEmployerProfile(profile: InsertEmployerProfile): Promise<EmployerProfile> {
     const [newProfile] = await db.insert(employerProfiles).values(profile).returning();
     return newProfile;
+  }
+
+  async updateEmployerProfile(userId: number, updates: Partial<InsertEmployerProfile>): Promise<EmployerProfile> {
+    const [updated] = await db.update(employerProfiles).set(updates).where(eq(employerProfiles.userId, userId)).returning();
+    return updated;
   }
 
   async getWorkerProfile(userId: number): Promise<WorkerProfile | undefined> {
@@ -105,31 +119,17 @@ export class DatabaseStorage implements IStorage {
     return newProfile;
   }
 
-  // === Jobs ===
   async createJob(job: InsertJob): Promise<Job> {
     const [newJob] = await db.insert(jobs).values(job).returning();
     return newJob;
   }
 
   async getJob(id: number): Promise<Job | undefined> {
-    // We'll need relation loading in the route handler or here. 
-    // For now, keeping storage simple, but Drizzle's query builder in routes is often better for relations.
-    // However, the interface returns `Job`, so let's stick to that.
     const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
     return job;
   }
 
   async getJobs(filters?: { industry?: string; location?: string }): Promise<Job[]> {
-    let query = db.select().from(jobs);
-    
-    // Simple exact match for MVP filters
-    if (filters?.industry) {
-      query = query.where(eq(jobs.industry, filters.industry)) as any;
-    }
-    // Location usually needs "contains" or similar, but exact for now or implement in routes
-    // Drizzle query builder is flexible. Let's return all and filter in memory if complex, or exact for now.
-    
-    // Note: To properly chain .where() with optional filters in Drizzle, it's better to build the conditions array.
     const conditions = [];
     if (filters?.industry) conditions.push(eq(jobs.industry, filters.industry));
     if (filters?.location) conditions.push(eq(jobs.location, filters.location));
@@ -145,7 +145,19 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(jobs).where(eq(jobs.employerId, employerId));
   }
 
-  // === Applications ===
+  async getPublishedJobs(): Promise<Job[]> {
+    return await db.select().from(jobs).where(eq(jobs.status, "OPEN"));
+  }
+
+  async getPublishedJobsByEmployer(employerId: number): Promise<Job[]> {
+    return await db.select().from(jobs).where(and(eq(jobs.employerId, employerId), eq(jobs.status, "OPEN")));
+  }
+
+  async updateJob(id: number, updates: Partial<InsertJob>): Promise<Job> {
+    const [updated] = await db.update(jobs).set({ ...updates, updatedAt: new Date() }).where(eq(jobs.id, id)).returning();
+    return updated;
+  }
+
   async createApplication(app: InsertApplication): Promise<Application> {
     const [newApp] = await db.insert(applications).values(app).returning();
     return newApp;
@@ -159,6 +171,18 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(applications).where(eq(applications.workerId, workerId));
   }
 
+  async getApplicationsByEmployer(employerId: number): Promise<Application[]> {
+    const employerJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.employerId, employerId));
+    if (employerJobs.length === 0) return [];
+    const jobIds = employerJobs.map(j => j.id);
+    const allApps: Application[] = [];
+    for (const jobId of jobIds) {
+      const apps = await db.select().from(applications).where(eq(applications.jobId, jobId));
+      allApps.push(...apps);
+    }
+    return allApps;
+  }
+
   async updateApplicationStatus(id: number, status: string, notes?: string): Promise<Application> {
     const [updated] = await db
       .update(applications)
@@ -168,7 +192,6 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  // === Staff ===
   async getStaffByEmployer(employerId: number): Promise<Staff[]> {
     return await db.select().from(staff).where(eq(staff.employerId, employerId));
   }
@@ -180,7 +203,6 @@ export class DatabaseStorage implements IStorage {
 
   async createStaff(s: InsertStaff): Promise<Staff> {
     const [newStaff] = await db.insert(staff).values(s).returning();
-    // Add employment history entry
     await db.insert(employmentHistory).values({
       staffId: newStaff.id,
       action: "hired",
@@ -203,7 +225,6 @@ export class DatabaseStorage implements IStorage {
     return record;
   }
 
-  // === Tasks ===
   async getTasksByEmployer(employerId: number): Promise<Task[]> {
     return await db.select().from(tasks).where(eq(tasks.employerId, employerId)).orderBy(desc(tasks.createdAt));
   }
@@ -227,7 +248,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(tasks).where(eq(tasks.id, id));
   }
 
-  // === Transactions ===
   async getTransactionsByEmployer(employerId: number, filters?: { type?: string; startDate?: Date; endDate?: Date }): Promise<Transaction[]> {
     const conditions = [eq(transactions.employerId, employerId)];
     if (filters?.type) conditions.push(eq(transactions.type, filters.type));
@@ -249,7 +269,6 @@ export class DatabaseStorage implements IStorage {
     return { totalRevenue, totalExpenses, netIncome: totalRevenue - totalExpenses };
   }
 
-  // === Job Board Postings ===
   async getJobBoardPostings(jobId: number): Promise<JobBoardPosting[]> {
     return await db.select().from(jobBoardPostings).where(eq(jobBoardPostings.jobId, jobId));
   }
@@ -267,6 +286,38 @@ export class DatabaseStorage implements IStorage {
   async getJobBoardPosting(id: number): Promise<JobBoardPosting | undefined> {
     const [p] = await db.select().from(jobBoardPostings).where(eq(jobBoardPostings.id, id));
     return p;
+  }
+
+  async getDistributionsByJob(jobId: number): Promise<JobDistribution[]> {
+    return await db.select().from(jobDistributions).where(eq(jobDistributions.jobId, jobId));
+  }
+
+  async createDistribution(d: InsertJobDistribution): Promise<JobDistribution> {
+    const [newDist] = await db.insert(jobDistributions).values(d).returning();
+    return newDist;
+  }
+
+  async updateDistribution(id: number, updates: Partial<InsertJobDistribution>): Promise<JobDistribution> {
+    const [updated] = await db.update(jobDistributions).set(updates).where(eq(jobDistributions.id, id)).returning();
+    return updated;
+  }
+
+  async getIntegrationsByEmployer(employerId: number): Promise<IntegrationCredential[]> {
+    return await db.select().from(integrationCredentials).where(eq(integrationCredentials.employerId, employerId));
+  }
+
+  async createIntegrationCredential(c: InsertIntegrationCredential): Promise<IntegrationCredential> {
+    const [cred] = await db.insert(integrationCredentials).values(c).returning();
+    return cred;
+  }
+
+  async recordClick(click: InsertApplicationClick): Promise<ApplicationClick> {
+    const [record] = await db.insert(applicationClicks).values(click).returning();
+    return record;
+  }
+
+  async getClicksByJob(jobId: number): Promise<ApplicationClick[]> {
+    return await db.select().from(applicationClicks).where(eq(applicationClicks.jobId, jobId));
   }
 }
 

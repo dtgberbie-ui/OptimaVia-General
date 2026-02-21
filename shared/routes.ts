@@ -9,6 +9,7 @@ import {
   insertTaskSchema,
   insertTransactionSchema,
   insertJobBoardPostingSchema,
+  insertJobDistributionSchema,
   jobs,
   applications,
   employerProfiles,
@@ -17,12 +18,12 @@ import {
   staff,
   tasks,
   transactions,
-  jobBoardPostings
+  jobBoardPostings,
+  jobDistributions,
+  integrationCredentials,
+  applicationClicks
 } from './schema';
 
-// ============================================
-// SHARED ERROR SCHEMAS
-// ============================================
 export const errorSchemas = {
   validation: z.object({
     message: z.string(),
@@ -39,9 +40,6 @@ export const errorSchemas = {
   })
 };
 
-// ============================================
-// API CONTRACT
-// ============================================
 export const api = {
   auth: {
     register: {
@@ -73,7 +71,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/user',
       responses: {
-        200: z.custom<typeof users.$inferSelect>(), // Can be null if not logged in
+        200: z.custom<typeof users.$inferSelect>(),
       },
     },
   },
@@ -104,6 +102,15 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    updateJob: {
+      method: 'PATCH' as const,
+      path: '/api/employer/jobs/:id',
+      input: insertJobSchema.partial(),
+      responses: {
+        200: z.custom<typeof jobs.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
     myJobs: {
       method: 'GET' as const,
       path: '/api/employer/jobs',
@@ -127,7 +134,6 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
-    // Staff Management
     listStaff: {
       method: 'GET' as const,
       path: '/api/employer/staff',
@@ -161,7 +167,6 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
-    // Tasks
     listTasks: {
       method: 'GET' as const,
       path: '/api/employer/tasks',
@@ -195,7 +200,6 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
-    // Financial Tracking
     listTransactions: {
       method: 'GET' as const,
       path: '/api/employer/transactions',
@@ -228,7 +232,6 @@ export const api = {
         }),
       },
     },
-    // Job Board Postings
     listJobPostings: {
       method: 'GET' as const,
       path: '/api/employer/jobs/:jobId/postings',
@@ -253,6 +256,50 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    listDistributions: {
+      method: 'GET' as const,
+      path: '/api/employer/jobs/:jobId/distributions',
+      responses: {
+        200: z.array(z.custom<typeof jobDistributions.$inferSelect>()),
+      },
+    },
+    createDistribution: {
+      method: 'POST' as const,
+      path: '/api/employer/jobs/:jobId/distributions',
+      input: insertJobDistributionSchema.omit({ jobId: true }),
+      responses: {
+        201: z.custom<typeof jobDistributions.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    updateDistribution: {
+      method: 'PATCH' as const,
+      path: '/api/employer/distributions/:id',
+      input: insertJobDistributionSchema.partial(),
+      responses: {
+        200: z.custom<typeof jobDistributions.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    listIntegrations: {
+      method: 'GET' as const,
+      path: '/api/employer/integrations',
+      responses: {
+        200: z.array(z.custom<typeof integrationCredentials.$inferSelect>()),
+      },
+    },
+    hiringStats: {
+      method: 'GET' as const,
+      path: '/api/employer/hiring/stats',
+      responses: {
+        200: z.object({
+          openJobs: z.number(),
+          totalApplicants: z.number(),
+          integrationsConnected: z.number(),
+          feedEnabled: z.boolean(),
+        }),
+      },
+    },
   },
   worker: {
     createProfile: {
@@ -275,7 +322,7 @@ export const api = {
     apply: {
       method: 'POST' as const,
       path: '/api/worker/applications',
-      input: insertApplicationSchema.omit({ workerId: true, status: true, fitScore: true, notes: true }),
+      input: insertApplicationSchema.omit({ workerId: true, status: true, notes: true }),
       responses: {
         201: z.custom<typeof applications.$inferSelect>(),
         400: errorSchemas.validation,
@@ -336,6 +383,49 @@ export const api = {
         200: z.object({ message: z.string(), subject: z.string().optional() }),
         400: errorSchemas.validation,
         404: errorSchemas.notFound,
+      },
+    },
+    rewriteForBoard: {
+      method: 'POST' as const,
+      path: '/api/ai/rewrite-for-board',
+      input: z.object({
+        jobId: z.number(),
+        board: z.string(),
+      }),
+      responses: {
+        200: z.object({ rewrittenText: z.string() }),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  feed: {
+    publicFeed: {
+      method: 'GET' as const,
+      path: '/api/jobs/feed.xml',
+      responses: {
+        200: z.string(),
+      },
+    },
+    employerFeed: {
+      method: 'GET' as const,
+      path: '/api/jobs/:employerId/feed.xml',
+      responses: {
+        200: z.string(),
+      },
+    },
+  },
+  tracking: {
+    recordClick: {
+      method: 'POST' as const,
+      path: '/api/track/click',
+      input: z.object({
+        jobId: z.number(),
+        source: z.string(),
+        sourceUrl: z.string().optional(),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
       },
     },
   },

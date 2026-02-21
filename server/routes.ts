@@ -6,21 +6,51 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
 import { db } from "./db";
-import { users, jobs, workerProfiles, applications } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, jobs, workerProfiles, applications, employerProfiles } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
+import crypto from "crypto";
 
-// Initialize OpenAI
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function generateJobXml(job: any, employerProfile: any, baseUrl: string): string {
+  const applyUrl = `${baseUrl}/jobs/${job.id}`;
+  return `  <job>
+    <job_id>${job.id}</job_id>
+    <title>${escapeXml(job.title)}</title>
+    <description><![CDATA[${job.description}]]></description>
+    <location>${escapeXml(job.location)}</location>
+    <country>${escapeXml(employerProfile?.country || '')}</country>
+    <region>${escapeXml(job.location)}</region>
+    <city>${escapeXml(job.city || '')}</city>
+    <employment_type>${escapeXml(job.employmentType || 'full-time')}</employment_type>
+    <salary_min>${job.payMin}</salary_min>
+    <salary_max>${job.payMax}</salary_max>
+    <salary_currency>USD</salary_currency>
+    <apply_url>${escapeXml(applyUrl)}</apply_url>
+    <company_name>${escapeXml(employerProfile?.companyName || 'Unknown')}</company_name>
+    <posted_date>${job.createdAt ? new Date(job.createdAt).toISOString() : ''}</posted_date>
+    <updated_date>${job.updatedAt ? new Date(job.updatedAt).toISOString() : ''}</updated_date>
+    <category>${escapeXml(job.industry)}</category>
+  </job>`;
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
-  // Set up Authentication (Session + Passport)
   setupAuth(app);
 
   // === EMPLOYER ROUTES ===
@@ -29,8 +59,8 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     try {
       const input = api.employer.createProfile.input.parse(req.body);
-      // Force user ID from session
-      const profile = await storage.createEmployerProfile({ ...input, userId: (req.user as any).id });
+      const feedToken = crypto.randomBytes(16).toString('hex');
+      const profile = await storage.createEmployerProfile({ ...input, userId: (req.user as any).id, feedToken });
       res.status(201).json(profile);
     } catch (err) {
       res.status(400).json(err);
@@ -54,6 +84,19 @@ export async function registerRoutes(
     }
   });
 
+  app.patch(api.employer.updateJob.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const job = await storage.getJob(Number(req.params.id));
+      if (!job || job.employerId !== (req.user as any).id) return res.status(404).send("Not found");
+      const input = api.employer.updateJob.input.parse(req.body);
+      const updated = await storage.updateJob(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
   app.get(api.employer.myJobs.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const jobs = await storage.getJobsByEmployer((req.user as any).id);
@@ -63,7 +106,6 @@ export async function registerRoutes(
   app.get(api.employer.jobApplications.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     
-    // Verify job belongs to employer
     const job = await storage.getJob(Number(req.params.jobId));
     if (!job || job.employerId !== (req.user as any).id) {
       return res.status(403).send("Forbidden");
@@ -71,7 +113,6 @@ export async function registerRoutes(
 
     const apps = await storage.getApplicationsByJob(Number(req.params.jobId));
     
-    // Enrich with worker details
     const enrichedApps = await Promise.all(apps.map(async (app) => {
       const worker = await storage.getUser(app.workerId);
       const workerProfile = await storage.getWorkerProfile(app.workerId);
@@ -98,7 +139,6 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
     const staffList = await storage.getStaffByEmployer((req.user as any).id);
     
-    // Enrich with worker profiles
     const enrichedStaff = await Promise.all(staffList.map(async (s) => {
       const workerProfile = await storage.getWorkerProfile(s.workerId);
       return { ...s, workerProfile: workerProfile || null };
@@ -146,7 +186,6 @@ export async function registerRoutes(
     if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
     const taskList = await storage.getTasksByEmployer((req.user as any).id);
     
-    // Enrich with assignee
     const enrichedTasks = await Promise.all(taskList.map(async (t) => {
       if (t.staffId) {
         const assignee = await storage.getStaff(t.staffId);
@@ -218,7 +257,7 @@ export async function registerRoutes(
     res.json(summary);
   });
 
-  // === JOB BOARD POSTINGS ===
+  // === JOB BOARD POSTINGS (Legacy) ===
 
   app.get(api.employer.listJobPostings.path, async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
@@ -243,8 +282,6 @@ export async function registerRoutes(
       const posting = await storage.getJobBoardPosting(Number(req.params.id));
       if (!posting) return res.status(404).send("Not found");
 
-      // Simulate posting to external job board (Indeed, etc.)
-      // In production, this would call the Indeed API with the employer's credentials
       const externalId = `EXT-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       
       await storage.updateJobBoardPosting(posting.id, {
@@ -260,6 +297,132 @@ export async function registerRoutes(
       });
     } catch (err) {
       res.status(500).json({ success: false, message: "Failed to post to job board" });
+    }
+  });
+
+  // === JOB DISTRIBUTIONS ===
+
+  app.get(api.employer.listDistributions.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    const distributions = await storage.getDistributionsByJob(Number(req.params.jobId));
+    res.json(distributions);
+  });
+
+  app.post(api.employer.createDistribution.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.createDistribution.input.parse(req.body);
+      const dist = await storage.createDistribution({ ...input, jobId: Number(req.params.jobId) });
+      res.status(201).json(dist);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.patch(api.employer.updateDistribution.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.updateDistribution.input.parse(req.body);
+      const updated = await storage.updateDistribution(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  // === INTEGRATIONS ===
+
+  app.get(api.employer.listIntegrations.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const integrations = await storage.getIntegrationsByEmployer((req.user as any).id);
+    res.json(integrations);
+  });
+
+  // === HIRING STATS ===
+
+  app.get(api.employer.hiringStats.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const employerId = (req.user as any).id;
+    
+    const employerJobs = await storage.getJobsByEmployer(employerId);
+    const openJobs = employerJobs.filter(j => j.status === "OPEN").length;
+    const allApps = await storage.getApplicationsByEmployer(employerId);
+    const integrations = await storage.getIntegrationsByEmployer(employerId);
+    const connectedCount = integrations.filter(i => i.status === "CONNECTED").length;
+    const profile = await storage.getEmployerProfile(employerId);
+    
+    res.json({
+      openJobs,
+      totalApplicants: allApps.length,
+      integrationsConnected: connectedCount,
+      feedEnabled: !!profile?.feedToken,
+    });
+  });
+
+  // === XML FEED ENDPOINTS ===
+
+  app.get(api.feed.publicFeed.path, async (req, res) => {
+    try {
+      const publishedJobs = await storage.getPublishedJobs();
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      let xmlJobs = '';
+      for (const job of publishedJobs) {
+        const profile = await storage.getEmployerProfile(job.employerId);
+        xmlJobs += generateJobXml(job, profile, baseUrl) + '\n';
+      }
+      
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<jobs updated="${new Date().toISOString()}">
+${xmlJobs}</jobs>`;
+
+      res.set('Content-Type', 'application/xml');
+      res.send(xml);
+    } catch (err) {
+      res.status(500).send("Feed generation error");
+    }
+  });
+
+  app.get(api.feed.employerFeed.path, async (req, res) => {
+    try {
+      const employerId = Number(req.params.employerId);
+      const token = req.query.token as string;
+      
+      const profile = await storage.getEmployerProfile(employerId);
+      if (!profile) return res.status(404).send("Employer not found");
+      
+      if (profile.feedToken && profile.feedToken !== token) {
+        return res.status(403).send("Invalid feed token");
+      }
+      
+      const publishedJobs = await storage.getPublishedJobsByEmployer(employerId);
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      
+      let xmlJobs = '';
+      for (const job of publishedJobs) {
+        xmlJobs += generateJobXml(job, profile, baseUrl) + '\n';
+      }
+      
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<jobs employer="${escapeXml(profile.companyName)}" updated="${new Date().toISOString()}">
+${xmlJobs}</jobs>`;
+
+      res.set('Content-Type', 'application/xml');
+      res.send(xml);
+    } catch (err) {
+      res.status(500).send("Feed generation error");
+    }
+  });
+
+  // === CLICK TRACKING ===
+
+  app.post(api.tracking.recordClick.path, async (req, res) => {
+    try {
+      const { jobId, source, sourceUrl } = req.body;
+      await storage.recordClick({ jobId, source, sourceUrl });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(400).json({ success: false });
     }
   });
 
@@ -287,31 +450,25 @@ export async function registerRoutes(
     try {
       const input = api.worker.apply.input.parse(req.body);
       
-      // Calculate Fit Score (Deterministic MVP Logic)
       const job = await storage.getJob(input.jobId);
       const workerProfile = await storage.getWorkerProfile((req.user as any).id);
       
-      let score = 50; // Base score
+      let score = 50;
       if (job && workerProfile) {
-        // Role match
         if (workerProfile.roles.some(r => job.title.includes(r))) score += 20;
-        // Certs match
         const matchingCerts = job.requiredCertifications.filter(c => workerProfile.certifications.includes(c));
         score += (matchingCerts.length * 10);
-        // Experience
         if (workerProfile.experienceYears > 2) score += 10;
-        
-        // Cap at 100
         score = Math.min(100, score);
       }
 
-      const app = await storage.createApplication({
-        ...input,
+      const [application] = await db.insert(applications).values({
+        jobId: input.jobId,
         workerId: (req.user as any).id,
+        status: "New",
         fitScore: score,
-        status: "New"
-      });
-      res.status(201).json(app);
+      }).returning();
+      res.status(201).json(application);
     } catch (err) {
       res.status(400).json(err);
     }
@@ -321,7 +478,6 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
     const apps = await storage.getApplicationsByWorker((req.user as any).id);
     
-    // Enrich with job details
     const enrichedApps = await Promise.all(apps.map(async (app) => {
       const job = await storage.getJob(app.jobId);
       return { ...app, job: job! };
@@ -334,10 +490,10 @@ export async function registerRoutes(
 
   app.get(api.jobs.list.path, async (req, res) => {
     const filters = req.query as { industry?: string; location?: string };
-    const jobs = await storage.getJobs(filters);
+    const allJobs = await storage.getJobs(filters);
+    const publishedJobs = allJobs.filter(j => j.status === "OPEN");
     
-    // Enrich with employer details
-    const enrichedJobs = await Promise.all(jobs.map(async (job) => {
+    const enrichedJobs = await Promise.all(publishedJobs.map(async (job) => {
       const employer = await storage.getUser(job.employerId);
       const profile = await storage.getEmployerProfile(job.employerId);
       return { ...job, employer: { ...employer!, employerProfile: profile || null } };
@@ -383,7 +539,6 @@ export async function registerRoutes(
       });
 
       const summaryText = response.choices[0].message.content || "";
-      // Naive split, AI usually outputs bullets
       const summary = summaryText.split("\n").filter(line => line.trim().length > 0);
 
       res.json({ summary });
@@ -420,6 +575,62 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.ai.rewriteForBoard.path, async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).send("Unauthorized");
+    try {
+      const { jobId, board } = req.body;
+      const job = await storage.getJob(jobId);
+      if (!job) return res.status(404).send("Job not found");
+
+      const employer = await storage.getUser(job.employerId);
+      const profile = await storage.getEmployerProfile(job.employerId);
+
+      try {
+        const prompt = `Rewrite this job posting for ${board}. Keep all factual information accurate - do not invent benefits, pay, or requirements that aren't listed. Format it appropriately for ${board}'s style. Keep it concise and professional.
+
+Job Title: ${job.title}
+Company: ${profile?.companyName || 'Company'}
+Location: ${job.location}${job.city ? ', ' + job.city : ''}
+Type: ${job.employmentType || 'Full-time'}
+Pay: $${job.payMin?.toLocaleString()} - $${job.payMax?.toLocaleString()}/year
+Description: ${job.description}
+${job.responsibilities ? 'Responsibilities: ' + job.responsibilities : ''}
+${job.requirements ? 'Requirements: ' + job.requirements : ''}
+${job.requiredCertifications?.length ? 'Required Certifications: ' + job.requiredCertifications.join(', ') : ''}
+${job.schedule ? 'Schedule: ' + job.schedule : ''}
+${job.benefits ? 'Benefits: ' + job.benefits : ''}`;
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{ role: "user", content: prompt }],
+        });
+
+        res.json({ rewrittenText: response.choices[0].message.content || "" });
+      } catch (aiErr) {
+        const templateText = `${job.title} - ${profile?.companyName || 'Company'}
+
+Location: ${job.location}${job.city ? ', ' + job.city : ''}
+Type: ${job.employmentType || 'Full-time'}
+Pay Range: $${job.payMin?.toLocaleString()} - $${job.payMax?.toLocaleString()}/year
+
+About the Role:
+${job.description}
+
+${job.responsibilities ? 'Key Responsibilities:\n' + job.responsibilities + '\n' : ''}
+${job.requirements ? 'Requirements:\n' + job.requirements + '\n' : ''}
+${job.requiredCertifications?.length ? 'Required Certifications: ' + job.requiredCertifications.join(', ') + '\n' : ''}
+${job.schedule ? 'Schedule: ' + job.schedule + '\n' : ''}
+${job.benefits ? 'Benefits: ' + job.benefits + '\n' : ''}
+Apply now at ${profile?.companyName || 'our company'}!`;
+
+        res.json({ rewrittenText: templateText });
+      }
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "AI Error" });
+    }
+  });
+
   // === SEED DATA ===
   await seedDatabase();
 
@@ -432,13 +643,14 @@ async function seedDatabase() {
 
   console.log("Seeding database...");
 
-  // Create Employers
   const emp1 = await storage.createUser({ username: "logistics_inc", password: "password", role: "employer" });
   await storage.createEmployerProfile({
     userId: emp1.id,
     companyName: "Swift Logistics",
     industry: "Logistics",
-    location: "Chicago, IL"
+    country: "United States",
+    location: "Illinois",
+    feedToken: crypto.randomBytes(16).toString('hex'),
   });
 
   const emp2 = await storage.createUser({ username: "care_plus", password: "password", role: "employer" });
@@ -446,16 +658,19 @@ async function seedDatabase() {
     userId: emp2.id,
     companyName: "CarePlus Home Health",
     industry: "Healthcare",
-    location: "Phoenix, AZ"
+    country: "United States",
+    location: "Arizona",
+    feedToken: crypto.randomBytes(16).toString('hex'),
   });
 
-  // Create Jobs
   await storage.createJob({
     employerId: emp1.id,
     title: "CDL-A Truck Driver",
     description: "Regional route, home weekends. Clean driving record required.",
     industry: "Logistics",
-    location: "Chicago, IL",
+    employmentType: "full-time",
+    location: "Illinois",
+    city: "Chicago",
     payMin: 60000,
     payMax: 80000,
     requiredCertifications: ["CDL-A"],
@@ -467,14 +682,15 @@ async function seedDatabase() {
     title: "Certified Nursing Assistant (CNA)",
     description: "In-home care for seniors. Flexible shifts.",
     industry: "Healthcare",
-    location: "Phoenix, AZ",
+    employmentType: "part-time",
+    location: "Arizona",
+    city: "Phoenix",
     payMin: 35000,
     payMax: 45000,
     requiredCertifications: ["CNA", "CPR"],
     status: "OPEN"
   });
 
-  // Create Workers
   const worker1 = await storage.createUser({ username: "driver_dave", password: "password", role: "worker" });
   await storage.createWorkerProfile({
     userId: worker1.id,
@@ -499,8 +715,7 @@ async function seedDatabase() {
     availability: "Part-time"
   });
 
-  // Create Application
-  await storage.createApplication({
+  await db.insert(applications).values({
     jobId: job2.id,
     workerId: worker2.id,
     status: "New",
