@@ -2,8 +2,8 @@ import { Link, useLocation } from "wouter";
 import { useUser, useLogout } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Briefcase, User, LogOut, Menu } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Briefcase, User, LogOut, Users, Calendar, DollarSign, CalendarDays, LayoutDashboard } from "lucide-react";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { data: user } = useUser();
@@ -11,6 +11,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   const isEmployer = user?.role === "employer";
+
+  const employerNavItems = [
+    { label: "Dashboard", href: "/employer/dashboard", icon: LayoutDashboard, match: (loc: string) => loc === "/employer/dashboard" },
+    { label: "Hiring", href: "/employer/hiring", icon: Briefcase, match: (loc: string) => loc.startsWith("/employer/hiring") || loc.startsWith("/employer/jobs") },
+    { label: "Workforce", href: "/employer/staff", icon: Users, match: (loc: string) => loc === "/employer/staff" },
+    { label: "Operations", href: "/employer/operations", icon: CalendarDays, match: (loc: string) => loc.startsWith("/employer/operations") || loc === "/employer/tasks" || loc === "/employer/shifts" },
+    { label: "Finance", href: "/employer/finances", icon: DollarSign, match: (loc: string) => loc === "/employer/finances" },
+  ];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -22,24 +30,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <Briefcase className="h-6 w-6" />
                 <span>OptimaVia</span>
               </Link>
-              
-              {/* Desktop Nav */}
-              <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-                <Link href="/jobs" className={`hover:text-primary transition-colors ${location === "/jobs" ? "text-primary font-semibold" : ""}`}>
+
+              <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                <Link href="/jobs" className={`px-3 py-2 rounded-md hover:text-primary hover:bg-muted/50 transition-colors ${location === "/jobs" ? "text-primary font-semibold bg-muted/50" : ""}`}>
                   Find Jobs
                 </Link>
-                {isEmployer && (
-                  <>
-                    <Link href="/employer/dashboard" className={`hover:text-primary transition-colors ${location === "/employer/dashboard" ? "text-primary font-semibold" : ""}`}>
-                      Dashboard
-                    </Link>
-                    <Link href="/employer/hiring" className={`hover:text-primary transition-colors ${location.startsWith("/employer/hiring") || location.startsWith("/employer/jobs") ? "text-primary font-semibold" : ""}`}>
-                      Hiring
-                    </Link>
-                  </>
-                )}
+                {isEmployer && employerNavItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`px-3 py-2 rounded-md hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1.5 ${item.match(location) ? "text-primary font-semibold bg-muted/50" : ""}`}
+                    data-testid={`nav-${item.label.toLowerCase()}`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                ))}
                 {user && !isEmployer && (
-                  <Link href="/worker/dashboard" className={`hover:text-primary transition-colors ${location === "/worker/dashboard" ? "text-primary font-semibold" : ""}`}>
+                  <Link href="/worker/dashboard" className={`px-3 py-2 rounded-md hover:text-primary hover:bg-muted/50 transition-colors ${location === "/worker/dashboard" ? "text-primary font-semibold bg-muted/50" : ""}`}>
                     My Applications
                   </Link>
                 )}
@@ -63,6 +71,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       <User className="mr-2 h-4 w-4" />
                       {user.username}
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {isEmployer && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link href="/employer/dashboard" className="cursor-pointer">
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem onClick={() => logout()} className="text-red-600 focus:text-red-600">
                       <LogOut className="mr-2 h-4 w-4" />
                       Log out

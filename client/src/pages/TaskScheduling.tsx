@@ -153,13 +153,13 @@ export default function TaskScheduling() {
                 <Label>Assign To</Label>
                 <Select 
                   value={newTask.staffId?.toString() || ""} 
-                  onValueChange={(value) => setNewTask({ ...newTask, staffId: value ? parseInt(value) : null })}
+                  onValueChange={(value) => setNewTask({ ...newTask, staffId: value && value !== "unassigned" ? parseInt(value) : null })}
                 >
                   <SelectTrigger data-testid="select-assignee">
                     <SelectValue placeholder="Select staff member" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
                     {(staff as any[] || []).map((s) => (
                       <SelectItem key={s.id} value={s.id.toString()}>
                         {s.workerProfile?.name || `Staff ${s.id}`}

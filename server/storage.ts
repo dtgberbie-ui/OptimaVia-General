@@ -3,6 +3,7 @@ import {
   users, employerProfiles, workerProfiles, jobs, applications,
   staff, employmentHistory, tasks, transactions, jobBoardPostings,
   jobDistributions, integrationCredentials, applicationClicks,
+  industryConfigs, scheduleShifts,
   type User, type InsertUser,
   type EmployerProfile, type InsertEmployerProfile,
   type WorkerProfile, type InsertWorkerProfile,
@@ -15,7 +16,9 @@ import {
   type JobBoardPosting, type InsertJobBoardPosting,
   type JobDistribution, type InsertJobDistribution,
   type IntegrationCredential, type InsertIntegrationCredential,
-  type ApplicationClick, type InsertApplicationClick
+  type ApplicationClick, type InsertApplicationClick,
+  type IndustryConfig, type InsertIndustryConfig,
+  type ScheduleShift, type InsertScheduleShift
 } from "@shared/schema";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 
@@ -76,6 +79,16 @@ export interface IStorage {
 
   recordClick(click: InsertApplicationClick): Promise<ApplicationClick>;
   getClicksByJob(jobId: number): Promise<ApplicationClick[]>;
+
+  getIndustryConfigs(): Promise<IndustryConfig[]>;
+  getIndustryConfigByName(name: string): Promise<IndustryConfig | undefined>;
+  createIndustryConfig(config: InsertIndustryConfig): Promise<IndustryConfig>;
+
+  getShiftsByEmployer(employerId: number): Promise<ScheduleShift[]>;
+  getShift(id: number): Promise<ScheduleShift | undefined>;
+  createShift(shift: InsertScheduleShift): Promise<ScheduleShift>;
+  updateShift(id: number, updates: Partial<InsertScheduleShift>): Promise<ScheduleShift>;
+  deleteShift(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -318,6 +331,43 @@ export class DatabaseStorage implements IStorage {
 
   async getClicksByJob(jobId: number): Promise<ApplicationClick[]> {
     return await db.select().from(applicationClicks).where(eq(applicationClicks.jobId, jobId));
+  }
+
+  async getIndustryConfigs(): Promise<IndustryConfig[]> {
+    return await db.select().from(industryConfigs);
+  }
+
+  async getIndustryConfigByName(name: string): Promise<IndustryConfig | undefined> {
+    const [config] = await db.select().from(industryConfigs).where(eq(industryConfigs.industryName, name));
+    return config;
+  }
+
+  async createIndustryConfig(config: InsertIndustryConfig): Promise<IndustryConfig> {
+    const [newConfig] = await db.insert(industryConfigs).values(config).returning();
+    return newConfig;
+  }
+
+  async getShiftsByEmployer(employerId: number): Promise<ScheduleShift[]> {
+    return await db.select().from(scheduleShifts).where(eq(scheduleShifts.employerId, employerId)).orderBy(desc(scheduleShifts.date));
+  }
+
+  async getShift(id: number): Promise<ScheduleShift | undefined> {
+    const [shift] = await db.select().from(scheduleShifts).where(eq(scheduleShifts.id, id));
+    return shift;
+  }
+
+  async createShift(shift: InsertScheduleShift): Promise<ScheduleShift> {
+    const [newShift] = await db.insert(scheduleShifts).values(shift).returning();
+    return newShift;
+  }
+
+  async updateShift(id: number, updates: Partial<InsertScheduleShift>): Promise<ScheduleShift> {
+    const [updated] = await db.update(scheduleShifts).set(updates).where(eq(scheduleShifts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteShift(id: number): Promise<void> {
+    await db.delete(scheduleShifts).where(eq(scheduleShifts.id, id));
   }
 }
 

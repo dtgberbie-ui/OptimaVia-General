@@ -1,14 +1,42 @@
-# OptimaVia - Workforce Reliability Platform
+# OptimaVia - Business Management Platform
 
 ## Overview
 
-OptimaVia is an AI-assisted workforce reliability and hiring platform for small and mid-sized businesses in labor-critical industries (home care, trucking, manufacturing). The platform enables employers to post full-time jobs and receive ranked applicants based on a "Fit & Reliability Score" (0-100). Candidates create profiles, apply to jobs, and employers manage applicants through a pipeline workflow.
+OptimaVia is an AI-assisted business management platform for small and mid-sized businesses in labor-critical industries. The platform provides modular business management across four core areas: Hiring, Workforce Management, Operations, and Finance. Industry-specific configuration drives module behavior, terminology, and custom fields.
 
 **Tagline:** "Making Work Reliable."
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Modules
+
+### Hiring Module
+- Post jobs, review applicants with Fit & Reliability Score (0-100)
+- Job distribution to external boards (Indeed, ZipRecruiter, etc.)
+- XML feed for programmatic job distribution
+- AI-powered candidate summarization and outreach drafting
+
+### Workforce Module
+- Staff management with performance ratings
+- Employee profiles, positions, hourly rates
+- Status tracking (active, inactive, terminated)
+
+### Operations Module
+- Task management with priority levels and status tracking
+- Shift scheduling with staff assignment
+- Operations hub combining tasks and shifts
+
+### Finance Module
+- Revenue and expense tracking
+- Financial summaries (total revenue, expenses, net income)
+- Transaction categorization
+
+### Industry Configuration
+- Pre-seeded configs for: Home Healthcare, Manufacturing, Logistics/Transportation, Hospitality/Restaurants, Automotive Repair, Retail
+- Each config includes: enabled modules, dashboard widgets, custom fields, terminology
+- Industry selection during employer onboarding with company size
 
 ## System Architecture
 
@@ -31,7 +59,18 @@ Preferred communication style: Simple, everyday language.
 - **ORM:** Drizzle ORM with PostgreSQL dialect
 - **Schema Location:** `shared/schema.ts` contains all table definitions
 - **Migrations:** Drizzle Kit for schema migrations (`npm run db:push`)
-- **Key Tables:** users, employer_profiles, worker_profiles, jobs, applications, staff, tasks, transactions, job_board_postings
+- **Key Tables:** users, employer_profiles, worker_profiles, jobs, applications, staff, tasks, transactions, job_board_postings, industry_configs, schedule_shifts
+
+### Key Pages & Routes
+```
+/employer/dashboard      - Business Dashboard (module overview + stats)
+/employer/hiring         - Hiring Dashboard (jobs, applicants)
+/employer/staff          - Workforce Management (staff profiles)
+/employer/operations     - Operations Hub (links to tasks + shifts)
+/employer/tasks          - Task Management
+/employer/shifts         - Shift Scheduling
+/employer/finances       - Financial Tracking
+```
 
 ### Scoring System
 The Fit Score (0-100) is calculated deterministically based on:

@@ -16,9 +16,12 @@ export const employerProfiles = pgTable("employer_profiles", {
   userId: integer("user_id").notNull().unique(),
   companyName: text("company_name").notNull(),
   industry: text("industry").notNull(),
+  companySize: text("company_size"),
   country: text("country").notNull().default(""),
   location: text("location").notNull(),
   feedToken: text("feed_token"),
+  enabledModules: text("enabled_modules").array(),
+  customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -150,6 +153,30 @@ export const jobBoardPostings = pgTable("job_board_postings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const industryConfigs = pgTable("industry_configs", {
+  id: serial("id").primaryKey(),
+  industryName: text("industry_name").notNull().unique(),
+  enabledModules: text("enabled_modules").array().notNull(),
+  dashboardWidgets: jsonb("dashboard_widgets"),
+  customFields: jsonb("custom_fields"),
+  terminology: jsonb("terminology"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const scheduleShifts = pgTable("schedule_shifts", {
+  id: serial("id").primaryKey(),
+  employerId: integer("employer_id").notNull(),
+  staffId: integer("staff_id"),
+  title: text("title").notNull(),
+  date: timestamp("date").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  location: text("location"),
+  notes: text("notes"),
+  status: text("status").notNull().default("scheduled"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -222,6 +249,11 @@ export const jobBoardPostingsRelations = relations(jobBoardPostings, ({ one }) =
   job: one(jobs, { fields: [jobBoardPostings.jobId], references: [jobs.id] }),
 }));
 
+export const scheduleShiftsRelations = relations(scheduleShifts, ({ one }) => ({
+  employer: one(users, { fields: [scheduleShifts.employerId], references: [users.id] }),
+  assignee: one(staff, { fields: [scheduleShifts.staffId], references: [staff.id] }),
+}));
+
 // === BASE SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -237,6 +269,8 @@ export const insertJobDistributionSchema = createInsertSchema(jobDistributions).
 export const insertIntegrationCredentialSchema = createInsertSchema(integrationCredentials).omit({ id: true, createdAt: true });
 export const insertApplicationClickSchema = createInsertSchema(applicationClicks).omit({ id: true });
 export const insertJobBoardPostingSchema = createInsertSchema(jobBoardPostings).omit({ id: true, createdAt: true });
+export const insertIndustryConfigSchema = createInsertSchema(industryConfigs).omit({ id: true, createdAt: true });
+export const insertScheduleShiftSchema = createInsertSchema(scheduleShifts).omit({ id: true, createdAt: true });
 
 // === TYPES ===
 
@@ -278,6 +312,12 @@ export type InsertApplicationClick = z.infer<typeof insertApplicationClickSchema
 
 export type JobBoardPosting = typeof jobBoardPostings.$inferSelect;
 export type InsertJobBoardPosting = z.infer<typeof insertJobBoardPostingSchema>;
+
+export type IndustryConfig = typeof industryConfigs.$inferSelect;
+export type InsertIndustryConfig = z.infer<typeof insertIndustryConfigSchema>;
+
+export type ScheduleShift = typeof scheduleShifts.$inferSelect;
+export type InsertScheduleShift = z.infer<typeof insertScheduleShiftSchema>;
 
 export type CreateJobRequest = Omit<InsertJob, "employerId">;
 export type CreateApplicationRequest = Omit<InsertApplication, "workerId" | "status" | "notes">;

@@ -1,0 +1,126 @@
+You are my senior full-stack engineer and product architect.
+
+We are evolving OptimaVia from a standalone job board into a comprehensive business management platform for small and mid-sized businesses. IMPORTANT: Do NOT remove or break any existing job board/hiring functionality. Instead, expand the platform modularly.
+
+CORE PRODUCT VISION:
+OptimaVia is an AI-powered business operations platform that helps SMBs manage workforce, finances, and daily operations in one place.
+
+EXISTING FEATURES TO PRESERVE:
+- Job board posting and applications
+- Candidate profiles
+- Employer job dashboards
+- Hiring workflows and applicant tracking
+These should remain fully functional.
+
+NEW MODULES TO ADD:
+
+1) WORKFORCE MANAGEMENT MODULE
+- Hiring integrations (existing job board preserved)
+- Candidate screening tools
+- Central employee/staff database
+- Employee profiles (skills, certifications, availability, performance notes)
+- Performance tracking and workforce reliability indicators
+- Basic reporting dashboard
+
+2) FINANCIAL MANAGEMENT MODULE
+- Revenue and expense tracking
+- Simple financial dashboard
+- Payments integration placeholder (Stripe-ready architecture)
+- Labor cost tracking tied to employees
+- Exportable financial summaries
+
+3) OPERATIONS MANAGEMENT MODULE
+- Job scheduling / shift scheduling
+- Task assignment workflows
+- Workflow coordination dashboard
+- Operational performance indicators
+- Notifications/reminders for tasks and shifts
+
+INDUSTRY-SPECIFIC INTERFACES (IMPORTANT):
+
+We want OptimaVia to adapt to each industry.
+
+Implement:
+
+- Industry selection during employer onboarding:
+  Examples:
+    Home Healthcare
+    Manufacturing
+    Logistics/Transportation
+    Automotive Repair
+    Hospitality/Restaurants
+    Retail
+    Personal Care/Salons
+    Other
+
+- Based on selected industry:
+  - Customize dashboard widgets
+  - Show relevant terminology
+  - Enable industry-specific fields
+  - Hide irrelevant features
+
+Examples:
+- Home care → shift compliance, caregiver tracking
+- Manufacturing → production shifts, certifications
+- Logistics → driver scheduling, delivery tracking
+- Automotive repair → technician scheduling
+
+ARCHITECTURE REQUIREMENTS:
+
+- Use a modular component structure so future industries can be added easily.
+- Implement an "industry configuration layer":
+  IndustryConfig {
+    industryName,
+    enabledModules,
+    customFields,
+    dashboardWidgets
+  }
+
+CUSTOMIZATION FOR EMPLOYERS:
+
+Each employer should be able to:
+- Customize dashboard layout
+- Add custom fields to staff profiles
+- Enable/disable modules
+- Set company-specific workflows
+
+UI/UX REQUIREMENTS:
+
+- Clean modern SaaS UI
+- Modular dashboard with tabs:
+  Hiring | Workforce | Finance | Operations
+- Responsive design
+- Maintain OptimaVia branding:
+  Tagline: "Making Work Reliable"
+
+DATA MODEL UPDATES:
+
+Add tables/entities:
+
+Employer
+IndustryType
+EmployeeProfile
+FinancialTransaction
+OperationalTask
+ScheduleShift
+CustomizationSettings
+
+Maintain backward compatibility with existing job board tables.
+
+DELIVERABLES:
+
+- Updated dashboard architecture
+- Modular navigation structure
+- Industry-aware onboarding flow
+- Working MVP for all three modules
+- Seed data for at least 3 industries
+- Updated README explaining architecture
+
+NON-GOALS FOR NOW:
+
+- Full ERP complexity
+- Payroll engine
+- Deep accounting integrations
+- Advanced AI automation
+
+Focus on a clean MVP that shows the expanded vision without overbuilding.

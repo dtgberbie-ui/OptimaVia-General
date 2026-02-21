@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
 import { db } from "./db";
-import { users, jobs, workerProfiles, applications, employerProfiles } from "@shared/schema";
+import { users, jobs, workerProfiles, applications, employerProfiles, industryConfigs, scheduleShifts } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -359,6 +359,88 @@ export async function registerRoutes(
     });
   });
 
+  // === SCHEDULE SHIFTS ===
+
+  app.get(api.employer.listShifts.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const shifts = await storage.getShiftsByEmployer((req.user as any).id);
+    const staffList = await storage.getStaffByEmployer((req.user as any).id);
+    const shiftsWithStaff = shifts.map(shift => ({
+      ...shift,
+      staffMember: shift.staffId ? staffList.find(s => s.id === shift.staffId) : null,
+    }));
+    res.json(shiftsWithStaff);
+  });
+
+  app.post(api.employer.createShift.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.createShift.input.parse(req.body);
+      const shift = await storage.createShift({ ...input, employerId: (req.user as any).id });
+      res.status(201).json(shift);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.patch(api.employer.updateShift.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      const input = api.employer.updateShift.input.parse(req.body);
+      const updated = await storage.updateShift(Number(req.params.id), input);
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json(err);
+    }
+  });
+
+  app.delete(api.employer.deleteShift.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    await storage.deleteShift(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // === DASHBOARD STATS ===
+
+  app.get(api.employer.dashboardStats.path, async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    const employerId = (req.user as any).id;
+
+    const [employerJobs, staffList, taskList, financialSummary, shifts] = await Promise.all([
+      storage.getJobsByEmployer(employerId),
+      storage.getStaffByEmployer(employerId),
+      storage.getTasksByEmployer(employerId),
+      storage.getFinancialSummary(employerId),
+      storage.getShiftsByEmployer(employerId),
+    ]);
+
+    const now = new Date();
+    res.json({
+      openJobs: employerJobs.filter(j => j.status === "OPEN").length,
+      totalStaff: staffList.length,
+      activeStaff: staffList.filter(s => s.status === "active").length,
+      pendingTasks: taskList.filter(t => t.status === "pending" || t.status === "in_progress").length,
+      completedTasks: taskList.filter(t => t.status === "completed").length,
+      totalRevenue: financialSummary.totalRevenue,
+      totalExpenses: financialSummary.totalExpenses,
+      netIncome: financialSummary.netIncome,
+      upcomingShifts: shifts.filter(s => s.date && new Date(s.date) >= now).length,
+    });
+  });
+
+  // === INDUSTRY CONFIGS ===
+
+  app.get(api.industryConfig.list.path, async (_req, res) => {
+    const configs = await storage.getIndustryConfigs();
+    res.json(configs);
+  });
+
+  app.get(api.industryConfig.getByIndustry.path, async (req, res) => {
+    const config = await storage.getIndustryConfigByName(decodeURIComponent(req.params.industry));
+    if (!config) return res.status(404).json({ message: "Industry config not found" });
+    res.json(config);
+  });
+
   // === XML FEED ENDPOINTS ===
 
   app.get(api.feed.publicFeed.path, async (req, res) => {
@@ -633,6 +715,7 @@ Apply now at ${profile?.companyName || 'our company'}!`;
 
   // === SEED DATA ===
   await seedDatabase();
+  await seedIndustryConfigs();
 
   return httpServer;
 }
@@ -724,4 +807,139 @@ async function seedDatabase() {
   });
 
   console.log("Database seeded!");
+}
+
+async function seedIndustryConfigs() {
+  const existing = await db.select().from(industryConfigs).limit(1);
+  if (existing.length > 0) return;
+
+  console.log("Seeding industry configs...");
+  const industryConfigData = [
+    {
+      industryName: "Home Healthcare",
+      enabledModules: ["hiring", "workforce", "finance", "operations"],
+      dashboardWidgets: JSON.stringify([
+        { type: "stat", key: "activeCaregiver", label: "Active Caregivers" },
+        { type: "stat", key: "shiftCompliance", label: "Shift Compliance" },
+        { type: "stat", key: "openPositions", label: "Open Positions" },
+        { type: "list", key: "upcomingShifts", label: "Upcoming Shifts" },
+      ]),
+      customFields: JSON.stringify({
+        staffProfile: ["patientCaseload", "shiftPreference", "specializations"],
+        shifts: ["patientName", "careType"],
+      }),
+      terminology: JSON.stringify({
+        staff: "Caregivers",
+        shift: "Visit",
+        task: "Care Task",
+        client: "Patient",
+      }),
+    },
+    {
+      industryName: "Manufacturing",
+      enabledModules: ["hiring", "workforce", "finance", "operations"],
+      dashboardWidgets: JSON.stringify([
+        { type: "stat", key: "productionShifts", label: "Production Shifts" },
+        { type: "stat", key: "certifiedWorkers", label: "Certified Workers" },
+        { type: "stat", key: "safetyIncidents", label: "Safety Score" },
+        { type: "list", key: "upcomingShifts", label: "Shift Schedule" },
+      ]),
+      customFields: JSON.stringify({
+        staffProfile: ["machinesCertified", "safetyTraining", "productionLine"],
+        shifts: ["productionLine", "machineAssignment"],
+      }),
+      terminology: JSON.stringify({
+        staff: "Operators",
+        shift: "Production Shift",
+        task: "Work Order",
+        client: "Production Line",
+      }),
+    },
+    {
+      industryName: "Logistics/Transportation",
+      enabledModules: ["hiring", "workforce", "finance", "operations"],
+      dashboardWidgets: JSON.stringify([
+        { type: "stat", key: "activeDrivers", label: "Active Drivers" },
+        { type: "stat", key: "deliveriesScheduled", label: "Routes Scheduled" },
+        { type: "stat", key: "fleetUtilization", label: "Fleet Utilization" },
+        { type: "list", key: "upcomingShifts", label: "Scheduled Routes" },
+      ]),
+      customFields: JSON.stringify({
+        staffProfile: ["licenseType", "endorsements", "vehicleAssigned"],
+        shifts: ["route", "vehicleId", "deliveryCount"],
+      }),
+      terminology: JSON.stringify({
+        staff: "Drivers",
+        shift: "Route",
+        task: "Delivery",
+        client: "Customer",
+      }),
+    },
+    {
+      industryName: "Hospitality/Restaurants",
+      enabledModules: ["hiring", "workforce", "finance", "operations"],
+      dashboardWidgets: JSON.stringify([
+        { type: "stat", key: "staffOnDuty", label: "Staff On Duty" },
+        { type: "stat", key: "openPositions", label: "Open Positions" },
+        { type: "stat", key: "laborCostPercent", label: "Labor Cost %" },
+        { type: "list", key: "upcomingShifts", label: "Today's Schedule" },
+      ]),
+      customFields: JSON.stringify({
+        staffProfile: ["foodHandlerCert", "positionType", "serveSafe"],
+        shifts: ["section", "role"],
+      }),
+      terminology: JSON.stringify({
+        staff: "Team Members",
+        shift: "Shift",
+        task: "Prep Task",
+        client: "Guest",
+      }),
+    },
+    {
+      industryName: "Automotive Repair",
+      enabledModules: ["hiring", "workforce", "finance", "operations"],
+      dashboardWidgets: JSON.stringify([
+        { type: "stat", key: "activeTechnicians", label: "Active Technicians" },
+        { type: "stat", key: "jobsScheduled", label: "Jobs Scheduled" },
+        { type: "stat", key: "laborRevenue", label: "Labor Revenue" },
+        { type: "list", key: "upcomingShifts", label: "Tech Schedule" },
+      ]),
+      customFields: JSON.stringify({
+        staffProfile: ["aseCertifications", "specialties", "bayAssignment"],
+        shifts: ["serviceType", "vehicleInfo"],
+      }),
+      terminology: JSON.stringify({
+        staff: "Technicians",
+        shift: "Service Slot",
+        task: "Work Order",
+        client: "Customer",
+      }),
+    },
+    {
+      industryName: "Retail",
+      enabledModules: ["hiring", "workforce", "finance", "operations"],
+      dashboardWidgets: JSON.stringify([
+        { type: "stat", key: "staffScheduled", label: "Staff Scheduled" },
+        { type: "stat", key: "openPositions", label: "Open Positions" },
+        { type: "stat", key: "laborCost", label: "Labor Cost" },
+        { type: "list", key: "upcomingShifts", label: "Floor Schedule" },
+      ]),
+      customFields: JSON.stringify({
+        staffProfile: ["department", "posRegisterTrained", "keyHolder"],
+        shifts: ["department", "register"],
+      }),
+      terminology: JSON.stringify({
+        staff: "Associates",
+        shift: "Floor Shift",
+        task: "Store Task",
+        client: "Customer",
+      }),
+    },
+  ];
+
+  for (const config of industryConfigData) {
+    await db.insert(industryConfigs).values(config).onConflictDoNothing();
+  }
+
+  console.log("Industry configs seeded!");
 }

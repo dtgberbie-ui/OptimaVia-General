@@ -52,6 +52,7 @@ export default function OnboardingEmployer() {
     defaultValues: {
       companyName: "",
       industry: "",
+      companySize: "",
       country: "",
       location: "",
     },
@@ -124,6 +125,33 @@ export default function OnboardingEmployer() {
                         data-testid="input-custom-industry"
                       />
                     )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="companySize"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company Size</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-company-size">
+                          <SelectValue placeholder="Select company size" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1-10" data-testid="option-size-1-10">1-10 employees</SelectItem>
+                        <SelectItem value="11-50" data-testid="option-size-11-50">11-50 employees</SelectItem>
+                        <SelectItem value="51-200" data-testid="option-size-51-200">51-200 employees</SelectItem>
+                        <SelectItem value="201-500" data-testid="option-size-201-500">201-500 employees</SelectItem>
+                        <SelectItem value="500+" data-testid="option-size-500+">500+ employees</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -10,6 +10,7 @@ import {
   insertTransactionSchema,
   insertJobBoardPostingSchema,
   insertJobDistributionSchema,
+  insertScheduleShiftSchema,
   jobs,
   applications,
   employerProfiles,
@@ -21,7 +22,9 @@ import {
   jobBoardPostings,
   jobDistributions,
   integrationCredentials,
-  applicationClicks
+  applicationClicks,
+  industryConfigs,
+  scheduleShifts
 } from './schema';
 
 export const errorSchemas = {
@@ -298,6 +301,72 @@ export const api = {
           integrationsConnected: z.number(),
           feedEnabled: z.boolean(),
         }),
+      },
+    },
+    listShifts: {
+      method: 'GET' as const,
+      path: '/api/employer/shifts',
+      responses: {
+        200: z.array(z.custom<typeof scheduleShifts.$inferSelect>()),
+      },
+    },
+    createShift: {
+      method: 'POST' as const,
+      path: '/api/employer/shifts',
+      input: insertScheduleShiftSchema.omit({ employerId: true }),
+      responses: {
+        201: z.custom<typeof scheduleShifts.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    updateShift: {
+      method: 'PATCH' as const,
+      path: '/api/employer/shifts/:id',
+      input: insertScheduleShiftSchema.omit({ employerId: true }).partial(),
+      responses: {
+        200: z.custom<typeof scheduleShifts.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    deleteShift: {
+      method: 'DELETE' as const,
+      path: '/api/employer/shifts/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+    dashboardStats: {
+      method: 'GET' as const,
+      path: '/api/employer/dashboard/stats',
+      responses: {
+        200: z.object({
+          openJobs: z.number(),
+          totalStaff: z.number(),
+          activeStaff: z.number(),
+          pendingTasks: z.number(),
+          completedTasks: z.number(),
+          totalRevenue: z.number(),
+          totalExpenses: z.number(),
+          netIncome: z.number(),
+          upcomingShifts: z.number(),
+        }),
+      },
+    },
+  },
+  industryConfig: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/industry-configs',
+      responses: {
+        200: z.array(z.custom<typeof industryConfigs.$inferSelect>()),
+      },
+    },
+    getByIndustry: {
+      method: 'GET' as const,
+      path: '/api/industry-configs/:industry',
+      responses: {
+        200: z.custom<typeof industryConfigs.$inferSelect>(),
+        404: errorSchemas.notFound,
       },
     },
   },
