@@ -8,7 +8,15 @@ import OpenAI from "openai";
 import { db } from "./db";
 import { users, jobs, workerProfiles, applications, employerProfiles, industryConfigs, scheduleShifts } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
-import crypto from "crypto";
+import crypto, { scrypt, randomBytes } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -726,7 +734,8 @@ async function seedDatabase() {
 
   console.log("Seeding database...");
 
-  const emp1 = await storage.createUser({ username: "logistics_inc", password: "password", role: "employer" });
+  const hashedPw = await hashPassword("password");
+  const emp1 = await storage.createUser({ username: "logistics_inc", password: hashedPw, role: "employer" });
   await storage.createEmployerProfile({
     userId: emp1.id,
     companyName: "Swift Logistics",
@@ -736,7 +745,7 @@ async function seedDatabase() {
     feedToken: crypto.randomBytes(16).toString('hex'),
   });
 
-  const emp2 = await storage.createUser({ username: "care_plus", password: "password", role: "employer" });
+  const emp2 = await storage.createUser({ username: "care_plus", password: hashedPw, role: "employer" });
   await storage.createEmployerProfile({
     userId: emp2.id,
     companyName: "CarePlus Home Health",
@@ -774,7 +783,7 @@ async function seedDatabase() {
     status: "OPEN"
   });
 
-  const worker1 = await storage.createUser({ username: "driver_dave", password: "password", role: "worker" });
+  const worker1 = await storage.createUser({ username: "driver_dave", password: hashedPw, role: "worker" });
   await storage.createWorkerProfile({
     userId: worker1.id,
     name: "Dave Miller",
@@ -786,7 +795,7 @@ async function seedDatabase() {
     availability: "Full-time"
   });
 
-  const worker2 = await storage.createUser({ username: "nurse_sarah", password: "password", role: "worker" });
+  const worker2 = await storage.createUser({ username: "nurse_sarah", password: hashedPw, role: "worker" });
   await storage.createWorkerProfile({
     userId: worker2.id,
     name: "Sarah Jones",
