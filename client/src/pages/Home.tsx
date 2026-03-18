@@ -15,8 +15,8 @@ export default function Home() {
             transition={{ duration: 0.5 }}
             className="text-4xl md:text-6xl lg:text-7xl font-display font-bold text-slate-900 tracking-tight mb-6"
           >
-            Making Workforce <br className="hidden md:block" />
-            <span className="text-primary">Reliability Standard</span>
+            Making Work <br className="hidden md:block" />
+            <span className="text-primary">Seamless</span>
           </motion.h1>
           
           <motion.p 
