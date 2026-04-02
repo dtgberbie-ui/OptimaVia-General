@@ -1,10 +1,20 @@
-# OptimaVia - Business Management Platform
+# OptimaVia - Modular Small Business Operations Platform
 
 ## Overview
 
-OptimaVia is an AI-assisted business management platform for small and mid-sized businesses in labor-critical industries. The platform provides modular business management across four core areas: Hiring, Workforce Management, Operations, and Finance. Industry-specific configuration drives module behavior, terminology, and custom fields.
+OptimaVia is a modular small business operations platform with plug-in modules for different industry verticals. It features a mobile-first UX with bottom tab navigation and supports both business owner (employer) and employee login accounts.
 
-**Tagline:** "Making Work Reliable."
+**Tagline:** "Making Work Seamless."
+
+## Demo Accounts
+
+| Account | Password | Role | Modules |
+|---|---|---|---|
+| `filta_raleigh` | password | employer | Field Service, Finances, Team |
+| `jake_filta` | password | employee | (Filta Raleigh employee) |
+| `maria_filta` | password | employee | (Filta Raleigh employee) |
+| `deon_filta` | password | employee | (Filta Raleigh employee) |
+| `sweet_scoops` | password | employer | Product Costing, Finances, Team |
 
 ## User Preferences
 
@@ -12,31 +22,32 @@ Preferred communication style: Simple, everyday language.
 
 ## Modules
 
-### Hiring Module
-- Post jobs, review applicants with Fit & Reliability Score (0-100)
-- Job distribution to external boards (Indeed, ZipRecruiter, etc.)
-- XML feed for programmatic job distribution
-- AI-powered candidate summarization and outreach drafting
+### Field Service Module (`field_service`)
+- Job dispatch: create/assign service jobs to employees
+- Job detail: tappable address → Google Maps navigation
+- Status workflow: unassigned → assigned → in_progress → completed
+- Photo documentation: check-in/check-out, key pickup/return photos
+- Key tracking toggle per job
+- Employee mobile view: see and work their assigned jobs
 
-### Workforce Module
-- Staff management with performance ratings
-- Employee profiles, positions, hourly rates
-- Status tracking (active, inactive, terminated)
+### Product Costing Module (`product_costing`)
+- Ingredient management: name, unit, cost per unit, supplier
+- Recipe builder: add ingredients with quantities to products
+- Auto-calculated cost per unit from recipe
+- Pricing calculator: enter target margin → get selling price
+- Summary table: product, cost, price, margin % 
 
-### Operations Module
-- Task management with priority levels and status tracking
-- Shift scheduling with staff assignment
-- Operations hub combining tasks and shifts
+### Finances Module (`finances`)
+- Revenue logging with categories
+- Expense logging with categories
+- Summary dashboard: total revenue, total expenses, net profit
+- Transaction list with tabs (All / Revenue / Expenses)
+- Delete transactions
 
-### Finance Module
-- Revenue and expense tracking
-- Financial summaries (total revenue, expenses, net income)
-- Transaction categorization
-
-### Industry Configuration
-- Pre-seeded configs for: Home Healthcare, Manufacturing, Logistics/Transportation, Hospitality/Restaurants, Automotive Repair, Retail
-- Each config includes: enabled modules, dashboard widgets, custom fields, terminology
-- Industry selection during employer onboarding with company size
+### Team Module (`team`)
+- Employee list with active/inactive toggle
+- Add employee with username/password (creates login account)
+- Employee accounts belong to employer's business via `businessId`
 
 ## System Architecture
 
@@ -45,78 +56,90 @@ Preferred communication style: Simple, everyday language.
 - **Routing:** Wouter for lightweight client-side routing
 - **State Management:** TanStack React Query for server state and caching
 - **UI Components:** shadcn/ui component library built on Radix UI primitives
-- **Styling:** TailwindCSS with custom design tokens (Deep Blue primary, Soft Green secondary)
-- **Forms:** React Hook Form with Zod validation via @hookform/resolvers
-- **Animations:** Framer Motion for page transitions and micro-interactions
+- **Styling:** TailwindCSS with custom design tokens
+- **Mobile-first:** Bottom tab navigation, 400px mobile viewport optimized
+- **Forms:** React Hook Form with Zod validation
 
 ### Backend Architecture
 - **Framework:** Express.js 5.x with TypeScript
-- **Authentication:** Passport.js with local strategy, session-based auth using express-session with httpOnly cookies
-- **Password Security:** scrypt hashing with random salt
-- **API Design:** RESTful endpoints defined in `shared/routes.ts` with Zod schemas for type-safe contracts
+- **Authentication:** Passport.js local strategy, session-based auth
+- **Password Security:** scrypt hashing with random salt (`${hash}.${salt}` format)
+- **Login route:** Uses custom Passport callback to return JSON errors (not plain text)
 
 ### Database Layer
 - **ORM:** Drizzle ORM with PostgreSQL dialect
-- **Schema Location:** `shared/schema.ts` contains all table definitions
-- **Migrations:** Drizzle Kit for schema migrations (`npm run db:push`)
-- **Key Tables:** users, employer_profiles, worker_profiles, jobs, applications, staff, tasks, transactions, job_board_postings, industry_configs, schedule_shifts
+- **Schema:** `shared/schema.ts`
+- **Migrations:** `npm run db:push`
+- **Key Tables:** users, employer_profiles, service_jobs, job_photos, ingredients, products, product_ingredients, transactions
 
 ### Key Pages & Routes
 ```
-/employer/dashboard      - Business Dashboard (module overview + stats)
-/employer/hiring         - Hiring Dashboard (jobs, applicants)
-/employer/staff          - Workforce Management (staff profiles)
-/employer/operations     - Operations Hub (links to tasks + shifts)
-/employer/tasks          - Task Management
-/employer/shifts         - Shift Scheduling
-/employer/finances       - Financial Tracking
+Employer (business owner):
+/employer/dashboard      - Dashboard with financial cards + today's jobs
+/employer/service-jobs   - Service job list with status filters
+/employer/service-jobs/:id - Job detail with photo upload
+/employer/ingredients    - Ingredient management
+/employer/products       - Products/recipes with pricing calculator
+/employer/finances       - Financial tracking
+/employer/team           - Team management
+/employer/settings       - Module toggle settings
+
+Employee:
+/employee/jobs           - Employee's assigned jobs
+/employee/jobs/:id       - Job detail: start/complete + photo upload
 ```
 
-### Scoring System
-The Fit Score (0-100) is calculated deterministically based on:
-- Role match (0-35 points)
-- Certifications match (0-25 points)
-- Availability match (0-15 points)
-- Experience level (0-15 points)
-- Location proximity (0-10 points)
+### Navigation
+- **Bottom tab bar:** Dynamic tabs based on enabled modules
+- **Employer modules map:**
+  - Dashboard always shown
+  - `field_service` → Jobs tab
+  - `product_costing` → Ingredients + Products tabs
+  - `finances` → Finances tab
+  - `team` → Team tab
+  - Settings always shown for employers
+- **Employee nav:** Only "My Jobs" tab
 
-### AI Integration
-- OpenAI API for candidate summarization and outreach message drafting
-- Fallback to template-based generation when API unavailable
-- Voice chat capabilities via Replit AI Integrations (audio processing, speech-to-text, text-to-speech)
+### User Roles
+- `employer`: Business owner, sees full management UI
+- `employee`: Belongs to employer via `businessId`, sees only assigned jobs
+- `worker`: Legacy job board applicant role (not used in new modules)
 
-### Project Structure
+### Seed Data
+Seed function checks for `filta_raleigh` user specifically before seeding. If not found, creates both demo businesses with employees, jobs, ingredients, products, and transactions.
+
+### API Endpoints (new modules)
 ```
-client/           # React frontend
-  src/
-    components/   # Reusable UI components
-    hooks/        # Custom React hooks for data fetching
-    pages/        # Route-level page components
-    lib/          # Utilities and query client
-server/           # Express backend
-  routes.ts       # API route handlers
-  storage.ts      # Database access layer
-  auth.ts         # Authentication setup
-shared/           # Shared between client/server
-  schema.ts       # Drizzle database schema
-  routes.ts       # API contract definitions
+GET/POST        /api/service-jobs
+GET/PATCH/DELETE /api/service-jobs/:id
+POST            /api/service-jobs/:id/photos
+GET/POST        /api/ingredients
+PATCH/DELETE    /api/ingredients/:id
+GET/POST        /api/products
+PATCH/DELETE    /api/products/:id
+GET/POST        /api/business/employees
+PATCH           /api/business/employees/:id
+PATCH           /api/business/modules
+DELETE          /api/employer/transactions/:id
 ```
+
+### Data Notes
+- Transaction amounts stored in cents (integer). $10.00 = 1000
+- Ingredient costs stored as real (floating point dollars per unit)
+- Service job scheduled date stored as text `YYYY-MM-DD`
+- Transaction date: sent from client as ISO string, coerced to Date on server
 
 ## External Dependencies
 
 ### Database
-- **PostgreSQL:** Primary database, connection via `DATABASE_URL` environment variable
-- **connect-pg-simple:** Session storage for production
+- **PostgreSQL:** `DATABASE_URL` environment variable
 
 ### AI Services
-- **OpenAI API:** Used for AI features (summarization, outreach drafting, voice chat)
-  - Configured via `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
-  - Image generation via `gpt-image-1` model
+- **OpenAI API:** `AI_INTEGRATIONS_OPENAI_API_KEY` and `AI_INTEGRATIONS_OPENAI_BASE_URL`
 
 ### Authentication
-- **Session Secret:** `SESSION_SECRET` environment variable (defaults to fallback for development)
+- **Session Secret:** `SESSION_SECRET` environment variable
 
 ### Build & Development
-- **Vite:** Development server with HMR and production bundling
-- **esbuild:** Server-side bundling for production
-- **Replit Plugins:** Runtime error overlay, cartographer, dev banner for Replit environment
+- **Vite:** Dev server with HMR
+- **esbuild:** Server bundling for production

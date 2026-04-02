@@ -1,0 +1,234 @@
+# OptimaVia General — Replit Build Prompt
+
+## Project Context
+
+I have an existing job board application called OptimaVia General. I am pivoting it from a two-sided job marketplace into a **modular small business operations platform**. The platform serves different types of small businesses by providing a shared core (dashboard, finances, task management) plus plug-in operational modules tailored to each business type.
+
+My first two customers are:
+1. **Filta Raleigh** — a field service franchise that dispatches workers to client sites for cooking oil filtration services.
+2. **An ice cream shop** — a small food business that needs to track costs, calculate per-unit pricing, and monitor profitability.
+
+---
+
+## Tech Stack
+
+- **Frontend:** React (with TypeScript if possible)
+- **Backend:** Node.js + Express
+- **Database:** PostgreSQL (use Replit's built-in DB or Supabase)
+- **Auth:** Email/password login with role-based access (Owner/Manager and Employee roles)
+- **Styling:** Tailwind CSS, mobile-first responsive design
+- **Deployment:** Replit
+
+---
+
+## Platform Architecture
+
+The app has three layers:
+
+### 1. CORE (every business gets this)
+
+#### Business Dashboard
+- Summary cards showing: total revenue (this month), total expenses (this month), net profit (this month), number of active jobs/tasks
+- A simple line or bar chart showing revenue vs expenses over the last 30 days
+- Recent activity feed (last 10 actions: jobs completed, expenses logged, revenue entries)
+
+#### Expense Tracking
+- Log an expense with: amount, category (dropdown: supplies, labor, fuel, equipment, rent, utilities, other — allow custom categories), date, optional note, optional photo attachment (receipt)
+- List view of all expenses with filters by category and date range
+- Monthly expense total by category (simple breakdown)
+
+#### Revenue Tracking
+- Log revenue with: amount, source/product (text or dropdown from saved products), date, optional note
+- List view of all revenue entries with filters by date range
+- Monthly revenue total
+
+#### Team Management
+- Owner/Manager can add employees (name, email, phone, role)
+- Employee list with status (active/inactive)
+- Each employee gets their own login and sees only their assigned work
+
+#### Job / Task System (shared across modules)
+- Create a job/task with: title, description, assigned employee, due date, priority (low/medium/high), status (unassigned → assigned → in progress → completed), location (optional — address field)
+- Manager view: see all jobs, filter by status, assign/reassign workers
+- Employee view: see only their assigned jobs, update status, tap address to open Google Maps
+
+---
+
+### 2. FIELD SERVICE MODULE (Filta uses this)
+
+This module is toggled ON for businesses that dispatch workers to client locations.
+
+#### Job Dispatch & Assignment
+- Manager creates a service job with: client business name, service address, scheduled date & time, assigned employee, job notes/instructions
+- When a job is assigned, the employee receives a push notification (or in-app notification)
+- Employee sees assigned jobs in a list sorted by date
+- Each job card shows: client name, address (tappable — opens Google Maps via `https://www.google.com/maps/dir/?api=1&destination={encoded_address}`), scheduled time, job status, action buttons
+
+#### Job Status Flow
+- Employee taps "Start Job" when they arrive → status changes to "In Progress", timestamp logged
+- Employee taps "Complete Job" when finished → status changes to "Completed", timestamp logged
+- Manager can see real-time status of all jobs on their dashboard
+
+#### Photo Documentation (Check-in / Check-out)
+- At job start: employee is prompted to take a photo (check-in photo). Employee uses device camera to capture a photo. Photo is uploaded and attached to the job record with timestamp.
+- At job completion: employee is prompted to take another photo (check-out photo). Same flow as check-in.
+- This is used for accountability. For Filta specifically, the check-in photo documents the state of equipment/keys BEFORE service, and check-out documents AFTER service.
+- Manager can review all photos from the job detail view.
+- If a check-out photo is not submitted within a configurable time after check-in (default: 4 hours), send a reminder notification to the employee.
+
+#### Key / Asset Accountability
+- For jobs that involve keys or assets: add a toggle "Key/Asset Tracking" on the job
+- When enabled, employee MUST upload a "key pickup" photo before starting the job and a "key return" photo before completing the job
+- The app will not allow the employee to mark the job as complete until the key return photo is uploaded
+- Manager gets a notification if the key return photo is not uploaded within 1 hour of job completion
+- Manager can view a "Key Accountability Log" — a list of all key pickup/return photos with timestamps and which employee handled them
+
+---
+
+### 3. PRODUCT COSTING MODULE (Ice Cream Shop uses this)
+
+This module is toggled ON for businesses that make and sell products and need to calculate per-unit costs.
+
+#### Ingredient / Input Management
+- Add an ingredient: name, unit of measurement (oz, lb, gallon, liter, each, etc.), cost per unit, supplier (optional)
+- List view of all ingredients with current costs
+- Edit ingredient costs when prices change (keep history of price changes)
+
+#### Recipe Builder
+- Create a product/recipe: name (e.g., "Vanilla Cone"), description, category (optional)
+- Add ingredients to the recipe: select ingredient, enter quantity used per unit of product
+- The app automatically calculates: **cost per unit** = sum of (ingredient quantity × ingredient cost per unit) for all ingredients in the recipe
+- Display the total cost per unit prominently on the recipe card
+
+#### Pricing Calculator
+- For each product/recipe, show: cost to make one unit, then let the owner enter their desired profit margin (percentage), and the app calculates the recommended selling price
+- OR: let the owner enter their current selling price, and the app calculates the actual profit margin
+- Show a summary table of all products with: product name, cost per unit, selling price, margin percentage, profit per unit
+
+#### Product Profitability Dashboard
+- If the owner logs daily revenue by product, show: which products are most profitable (by margin), which products sell the most (by volume), total profit breakdown by product
+- Simple table or chart view
+
+---
+
+## Data Model (suggested schema)
+
+```
+businesses
+- id, name, type (field_service | product | general), owner_id, created_at
+- active_modules (array: ['field_service', 'product_costing'])
+
+users
+- id, business_id, name, email, phone, password_hash, role (owner | manager | employee), status (active | inactive), created_at
+
+jobs
+- id, business_id, title, description, assigned_to (user_id), status (unassigned | assigned | in_progress | completed), priority (low | medium | high), due_date, location_address, location_lat, location_lng, client_name, key_tracking_enabled (boolean), scheduled_date, scheduled_time, created_by, created_at, started_at, completed_at
+
+job_photos
+- id, job_id, user_id, photo_url, photo_type (checkin | checkout | key_pickup | key_return), timestamp, note
+
+expenses
+- id, business_id, user_id, amount, category, date, note, receipt_photo_url, created_at
+
+revenues
+- id, business_id, user_id, amount, source, product_id (optional), date, note, created_at
+
+ingredients
+- id, business_id, name, unit, cost_per_unit, supplier, created_at, updated_at
+
+products
+- id, business_id, name, description, category, selling_price, created_at
+
+product_ingredients (recipe join table)
+- id, product_id, ingredient_id, quantity_per_unit
+
+notifications
+- id, business_id, user_id, message, type, read (boolean), created_at
+```
+
+---
+
+## User Flows
+
+### Flow 1: Manager at Filta creates and dispatches a job
+1. Manager logs in → sees dashboard with today's jobs and business stats
+2. Manager taps "Create Job"
+3. Fills in: client name, service address, date/time, selects employee from dropdown, adds notes, toggles "Key Tracking" ON
+4. Taps "Assign Job"
+5. Employee receives notification: "New job assigned: [Client Name] at [Address] on [Date]"
+6. Job appears on manager's job board under "Assigned"
+
+### Flow 2: Employee at Filta completes a job with key tracking
+1. Employee logs in → sees their assigned jobs for today
+2. Taps on the job → sees job details: client name, address, notes, "Key Tracking Required" badge
+3. Taps the address → Google Maps opens with directions
+4. Arrives at location → taps "Start Job"
+5. App prompts: "Take a photo of the key before picking it up"
+6. Employee takes photo → photo saved with timestamp
+7. Employee completes the service
+8. Taps "Complete Job"
+9. App prompts: "Take a photo of the key after returning it"
+10. Employee takes photo → photo saved with timestamp
+11. Job status updates to "Completed"
+12. Manager can review the job, see both key photos with timestamps
+
+### Flow 3: Ice cream shop owner calculates product costs
+1. Owner logs in → sees dashboard with revenue, expenses, profit
+2. Goes to "Ingredients" → adds ingredients: cream ($4.50/gallon), sugar ($0.80/lb), vanilla extract ($12.00/bottle — 16oz), waffle cones ($0.15/each)
+3. Goes to "Products" → taps "Create Product" → names it "Vanilla Waffle Cone"
+4. Adds ingredients to recipe: cream (3 oz per cone), sugar (0.5 oz per cone), vanilla extract (0.25 oz per cone), waffle cone (1 each)
+5. App calculates: cost per cone = $0.XX (auto-calculated from ingredient costs and quantities)
+6. Owner enters desired margin: 65% → App shows recommended price: $X.XX
+7. Owner can see all products in a table comparing costs, prices, and margins
+
+### Flow 4: Ice cream shop owner tracks daily finances
+1. Owner logs in → taps "Log Revenue"
+2. Enters: $340 from walk-in sales, today's date
+3. Taps "Log Expense"
+4. Enters: $85 for cream (category: supplies), attaches photo of receipt
+5. Dashboard updates: shows today's revenue, expenses, and profit
+6. Over time, owner can see monthly trends and know if the business is growing
+
+---
+
+## UI/UX Requirements
+
+- **Mobile-first design.** Most users will access this on their phones.
+- **Clean, simple interface.** These are small business owners and field workers, not tech people. Minimize clicks. Use large tap targets. Clear labels.
+- **Color scheme:** Professional but approachable. Use a primary brand color (suggest a blue or teal) with green for positive numbers/profit, red for expenses/losses.
+- **Navigation:** Bottom tab bar for mobile with: Dashboard, Jobs/Tasks, Finances, Team, and Settings/More.
+- **The app name is "OptimaVia General"** — show this in the header/login screen.
+
+---
+
+## Module Toggle System
+
+In business settings, the owner can enable/disable modules:
+- "Field Service Operations" → ON/OFF (shows/hides job dispatch, photo documentation, key tracking features)
+- "Product Costing" → ON/OFF (shows/hides ingredients, recipes, pricing calculator)
+
+When a module is OFF, its navigation items and features are completely hidden from the UI. The core features (dashboard, expenses, revenue, tasks, team) are always visible.
+
+---
+
+## What to Build First (Priority Order)
+
+1. Auth system (login, registration, role-based access)
+2. Business setup (create business, enable modules)
+3. Core dashboard with revenue/expense tracking
+4. Job/Task system with assignment and status flow
+5. Field Service module (photo documentation, key tracking, Google Maps integration)
+6. Product Costing module (ingredients, recipes, pricing calculator)
+7. Notifications system
+8. Settings and module toggle
+
+---
+
+## Important Notes
+
+- Do NOT build a job board or marketplace. This is an internal operations tool for businesses.
+- Every feature should work well on mobile browsers. Optimize for phone screens.
+- Use the device camera API (navigator.mediaDevices / input type file with capture attribute) for photo features.
+- Store photos as base64 or use file upload to server storage.
+- Keep the code modular so I can add new modules later for other business types.
+- Add seed data for demo purposes: one Filta-type business with 3 employees and sample jobs, one ice cream shop with sample ingredients and products.

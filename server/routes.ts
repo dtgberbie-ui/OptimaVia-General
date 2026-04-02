@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import OpenAI from "openai";
 import { db } from "./db";
-import { users, jobs, workerProfiles, applications, employerProfiles, industryConfigs, scheduleShifts } from "@shared/schema";
+import { users, jobs, workerProfiles, applications, employerProfiles, industryConfigs, scheduleShifts, serviceJobs } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import crypto, { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
@@ -251,11 +251,22 @@ export async function registerRoutes(
   app.post(api.employer.createTransaction.path, async (req, res) => {
     if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
     try {
-      const input = api.employer.createTransaction.input.parse(req.body);
+      const body = { ...req.body, date: req.body.date ? new Date(req.body.date) : new Date() };
+      const input = api.employer.createTransaction.input.parse(body);
       const newTx = await storage.createTransaction({ ...input, employerId: (req.user as any).id });
       res.status(201).json(newTx);
     } catch (err) {
       res.status(400).json(err);
+    }
+  });
+
+  app.delete("/api/employer/transactions/:id", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user as any).role !== 'employer') return res.status(401).send("Unauthorized");
+    try {
+      await storage.deleteTransaction(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete transaction" });
     }
   });
 
@@ -721,6 +732,188 @@ Apply now at ${profile?.companyName || 'our company'}!`;
     }
   });
 
+  // === EMPLOYEE MANAGEMENT ===
+
+  app.get("/api/business/employees", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const employees = await storage.getEmployeesByBusiness(req.user.id);
+    res.json(employees);
+  });
+
+  app.post("/api/business/employees", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const { name, email, phone, username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ message: "Username and password required" });
+    const existing = await storage.getUserByUsername(username);
+    if (existing) return res.status(400).json({ message: "Username already taken" });
+    const hashedPw = await hashPassword(password);
+    const employee = await storage.createUser({
+      username,
+      password: hashedPw,
+      role: "employee",
+      name: name || null,
+      email: email || null,
+      phone: phone || null,
+      businessId: req.user.id,
+    });
+    res.status(201).json(employee);
+  });
+
+  app.patch("/api/business/employees/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id);
+    const updated = await storage.updateUser(id, req.body);
+    res.json(updated);
+  });
+
+  // === SERVICE JOBS (FIELD SERVICE MODULE) ===
+
+  app.get("/api/service-jobs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const user = req.user;
+    if (user.role === "employee") {
+      const jobs = await storage.getServiceJobsByEmployee(user.id);
+      return res.json(jobs);
+    }
+    const jobs = await storage.getServiceJobsByBusiness(user.id);
+    res.json(jobs);
+  });
+
+  app.get("/api/service-jobs/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const job = await storage.getServiceJob(parseInt(req.params.id));
+    if (!job) return res.status(404).json({ message: "Not found" });
+    res.json(job);
+  });
+
+  app.post("/api/service-jobs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const body = req.body;
+    const job = await storage.createServiceJob({
+      ...body,
+      businessId: req.user.id,
+      createdBy: req.user.id,
+      status: body.assignedTo ? "assigned" : "unassigned",
+    });
+    res.status(201).json(job);
+  });
+
+  app.patch("/api/service-jobs/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id);
+    const updates = { ...req.body };
+    if (updates.status === "in_progress") updates.startedAt = new Date();
+    if (updates.status === "completed") updates.completedAt = new Date();
+    const job = await storage.updateServiceJob(id, updates);
+    res.json(job);
+  });
+
+  app.delete("/api/service-jobs/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    await storage.deleteServiceJob(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Job photos
+  app.get("/api/service-jobs/:id/photos", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const photos = await storage.getJobPhotos(parseInt(req.params.id));
+    res.json(photos);
+  });
+
+  app.post("/api/service-jobs/:id/photos", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const { photoUrl, photoType, note } = req.body;
+    if (!photoUrl || !photoType) return res.status(400).json({ message: "photoUrl and photoType required" });
+    const photo = await storage.addJobPhoto({
+      jobId: parseInt(req.params.id),
+      userId: req.user.id,
+      photoUrl,
+      photoType,
+      note: note || null,
+    });
+    res.status(201).json(photo);
+  });
+
+  // === INGREDIENTS (PRODUCT COSTING MODULE) ===
+
+  app.get("/api/ingredients", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const items = await storage.getIngredientsByBusiness(req.user.id);
+    res.json(items);
+  });
+
+  app.post("/api/ingredients", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const item = await storage.createIngredient({ ...req.body, businessId: req.user.id });
+    res.status(201).json(item);
+  });
+
+  app.patch("/api/ingredients/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const item = await storage.updateIngredient(parseInt(req.params.id), req.body);
+    res.json(item);
+  });
+
+  app.delete("/api/ingredients/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    await storage.deleteIngredient(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
+  // === PRODUCTS (PRODUCT COSTING MODULE) ===
+
+  app.get("/api/products", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const items = await storage.getProductsByBusiness(req.user.id);
+    res.json(items);
+  });
+
+  app.get("/api/products/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const item = await storage.getProduct(parseInt(req.params.id));
+    if (!item) return res.status(404).json({ message: "Not found" });
+    res.json(item);
+  });
+
+  app.post("/api/products", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const { ingredients: ingredientList, ...productData } = req.body;
+    const product = await storage.createProduct({ ...productData, businessId: req.user.id });
+    if (ingredientList && Array.isArray(ingredientList)) {
+      await storage.setProductIngredients(product.id, ingredientList);
+    }
+    const enriched = await storage.getProduct(product.id);
+    res.status(201).json(enriched);
+  });
+
+  app.patch("/api/products/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id);
+    const { ingredients: ingredientList, ...productData } = req.body;
+    const product = await storage.updateProduct(id, productData);
+    if (ingredientList !== undefined && Array.isArray(ingredientList)) {
+      await storage.setProductIngredients(id, ingredientList);
+    }
+    const enriched = await storage.getProduct(product.id);
+    res.json(enriched);
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    await storage.deleteProduct(parseInt(req.params.id));
+    res.json({ success: true });
+  });
+
+  // === BUSINESS MODULE SETTINGS ===
+
+  app.patch("/api/business/modules", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const { enabledModules, businessType } = req.body;
+    const updated = await storage.updateEmployerProfile(req.user.id, { enabledModules, businessType });
+    res.json(updated);
+  });
+
   // === SEED DATA ===
   await seedDatabase();
   await seedIndustryConfigs();
@@ -729,90 +922,201 @@ Apply now at ${profile?.companyName || 'our company'}!`;
 }
 
 async function seedDatabase() {
-  const existingUsers = await db.select().from(users).limit(1);
-  if (existingUsers.length > 0) return;
+  // Check if demo accounts already exist
+  const filtaUser = await storage.getUserByUsername("filta_raleigh");
+  if (filtaUser) return;
 
-  console.log("Seeding database...");
+  console.log("Seeding demo accounts...");
 
   const hashedPw = await hashPassword("password");
-  const emp1 = await storage.createUser({ username: "logistics_inc", password: hashedPw, role: "employer" });
+
+  // === FILTA RALEIGH — Field Service Business ===
+  const filta = await storage.createUser({
+    username: "filta_raleigh",
+    password: hashedPw,
+    role: "employer",
+    name: "Filta Raleigh Manager",
+    email: "manager@filtaraleigh.com",
+  });
   await storage.createEmployerProfile({
-    userId: emp1.id,
+    userId: filta.id,
+    companyName: "Filta Raleigh",
+    industry: "Field Service",
+    country: "United States",
+    location: "Raleigh, NC",
+    businessType: "field_service",
+    enabledModules: ["field_service", "finances", "team"],
+    feedToken: crypto.randomBytes(16).toString('hex'),
+  });
+
+  const emp1 = await storage.createUser({
+    username: "jake_filta",
+    password: hashedPw,
+    role: "employee",
+    name: "Jake Martinez",
+    email: "jake@filtaraleigh.com",
+    phone: "919-555-0101",
+    businessId: filta.id,
+  });
+  const emp2 = await storage.createUser({
+    username: "maria_filta",
+    password: hashedPw,
+    role: "employee",
+    name: "Maria Chen",
+    email: "maria@filtaraleigh.com",
+    phone: "919-555-0102",
+    businessId: filta.id,
+  });
+  const emp3 = await storage.createUser({
+    username: "deon_filta",
+    password: hashedPw,
+    role: "employee",
+    name: "Deon Williams",
+    email: "deon@filtaraleigh.com",
+    phone: "919-555-0103",
+    businessId: filta.id,
+  });
+
+  const today = new Date();
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+
+  await storage.createServiceJob({
+    businessId: filta.id,
+    title: "Oil Filtration Service",
+    clientName: "The Pit BBQ",
+    serviceAddress: "328 W Davie St, Raleigh, NC 27601",
+    scheduledDate: fmt(today),
+    scheduledTime: "09:00",
+    assignedTo: emp1.id,
+    notes: "Monthly service. Customer prefers early morning. Side door access code: 4521.",
+    status: "assigned",
+    priority: "high",
+    keyTrackingEnabled: true,
+    createdBy: filta.id,
+  });
+
+  await storage.createServiceJob({
+    businessId: filta.id,
+    title: "Oil Filtration Service",
+    clientName: "Beasley's Chicken + Honey",
+    serviceAddress: "237 S Wilmington St, Raleigh, NC 27601",
+    scheduledDate: fmt(today),
+    scheduledTime: "11:00",
+    assignedTo: emp2.id,
+    notes: "Bi-weekly service. Ask for Carlos.",
+    status: "in_progress",
+    priority: "medium",
+    keyTrackingEnabled: false,
+    createdBy: filta.id,
+  });
+
+  await storage.createServiceJob({
+    businessId: filta.id,
+    title: "Oil Filtration Service",
+    clientName: "State of Beer",
+    serviceAddress: "1053 E Whitaker Mill Rd, Raleigh, NC 27604",
+    scheduledDate: fmt(yesterday),
+    scheduledTime: "14:00",
+    assignedTo: emp3.id,
+    notes: "Monthly service.",
+    status: "completed",
+    priority: "low",
+    keyTrackingEnabled: false,
+    createdBy: filta.id,
+  });
+
+  await storage.createServiceJob({
+    businessId: filta.id,
+    title: "Oil Filtration Service",
+    clientName: "Coquette",
+    serviceAddress: "4351 The Circle at N Hills St, Raleigh, NC 27609",
+    scheduledDate: fmt(tomorrow),
+    scheduledTime: "10:00",
+    assignedTo: null,
+    notes: "New client. Confirm contact with front desk before visit.",
+    status: "unassigned",
+    priority: "medium",
+    keyTrackingEnabled: true,
+    createdBy: filta.id,
+  });
+
+  // Some sample transactions for Filta
+  await storage.createTransaction({ employerId: filta.id, type: "revenue", category: "Service", amount: 45000, description: "The Pit BBQ — monthly service", date: new Date() });
+  await storage.createTransaction({ employerId: filta.id, type: "revenue", category: "Service", amount: 38000, description: "Beasley's — bi-weekly service", date: new Date() });
+  await storage.createTransaction({ employerId: filta.id, type: "expense", category: "Supplies", amount: 12000, description: "Filter cartridges — bulk order", date: new Date() });
+  await storage.createTransaction({ employerId: filta.id, type: "expense", category: "Fuel", amount: 8500, description: "Fleet fuel — this week", date: new Date() });
+
+  // === SWEET SCOOPS ICE CREAM — Product Costing Business ===
+  const iceCream = await storage.createUser({
+    username: "sweet_scoops",
+    password: hashedPw,
+    role: "employer",
+    name: "Sweet Scoops Owner",
+    email: "owner@sweetscoops.com",
+  });
+  await storage.createEmployerProfile({
+    userId: iceCream.id,
+    companyName: "Sweet Scoops Ice Cream",
+    industry: "Food & Beverage",
+    country: "United States",
+    location: "Chapel Hill, NC",
+    businessType: "product",
+    enabledModules: ["product_costing", "finances", "team"],
+    feedToken: crypto.randomBytes(16).toString('hex'),
+  });
+
+  // Ingredients
+  const cream = await storage.createIngredient({ businessId: iceCream.id, name: "Heavy Cream", unit: "gallon", costPerUnit: 4.50, supplier: "Homeland Dairy" });
+  const sugar = await storage.createIngredient({ businessId: iceCream.id, name: "Cane Sugar", unit: "lb", costPerUnit: 0.80, supplier: "US Foods" });
+  const vanilla = await storage.createIngredient({ businessId: iceCream.id, name: "Pure Vanilla Extract", unit: "oz", costPerUnit: 0.75, supplier: "Nielsen-Massey" });
+  const waffleCone = await storage.createIngredient({ businessId: iceCream.id, name: "Waffle Cone", unit: "each", costPerUnit: 0.15, supplier: "Joy Cone Co." });
+  const chocolateChips = await storage.createIngredient({ businessId: iceCream.id, name: "Chocolate Chips", unit: "oz", costPerUnit: 0.18, supplier: "Ghirardelli" });
+  const strawberries = await storage.createIngredient({ businessId: iceCream.id, name: "Fresh Strawberries", unit: "oz", costPerUnit: 0.22, supplier: "Local Farm" });
+
+  // Products
+  const vanillaCone = await storage.createProduct({ businessId: iceCream.id, name: "Vanilla Waffle Cone", description: "Classic vanilla soft serve in a waffle cone", category: "Cones", sellingPrice: 4.50 });
+  await storage.setProductIngredients(vanillaCone.id, [
+    { ingredientId: cream.id, quantityPerUnit: 0.0625 },      // 1/16 gallon = 8oz cream per cone (as a float)
+    { ingredientId: sugar.id, quantityPerUnit: 0.03125 },     // 0.5oz sugar (lb = 16oz, so 0.5/16)
+    { ingredientId: vanilla.id, quantityPerUnit: 0.0625 },    // 0.25oz vanilla extract (in 4oz bottle = 0.0625)
+    { ingredientId: waffleCone.id, quantityPerUnit: 1 },      // 1 cone
+  ]);
+
+  const chocoScoop = await storage.createProduct({ businessId: iceCream.id, name: "Chocolate Chip Sundae", description: "Two scoops of vanilla with chocolate chips", category: "Sundaes", sellingPrice: 5.75 });
+  await storage.setProductIngredients(chocoScoop.id, [
+    { ingredientId: cream.id, quantityPerUnit: 0.09375 },    // ~12oz
+    { ingredientId: sugar.id, quantityPerUnit: 0.0625 },
+    { ingredientId: vanilla.id, quantityPerUnit: 0.0625 },
+    { ingredientId: chocolateChips.id, quantityPerUnit: 2 }, // 2oz chips
+  ]);
+
+  const strawberryScoop = await storage.createProduct({ businessId: iceCream.id, name: "Strawberry Cone", description: "Fresh strawberry ice cream in a waffle cone", category: "Cones", sellingPrice: 4.75 });
+  await storage.setProductIngredients(strawberryScoop.id, [
+    { ingredientId: cream.id, quantityPerUnit: 0.0625 },
+    { ingredientId: sugar.id, quantityPerUnit: 0.03125 },
+    { ingredientId: strawberries.id, quantityPerUnit: 3 }, // 3oz strawberries
+    { ingredientId: waffleCone.id, quantityPerUnit: 1 },
+  ]);
+
+  // Revenue and expenses for ice cream shop
+  await storage.createTransaction({ employerId: iceCream.id, type: "revenue", category: "Walk-in Sales", amount: 34000, description: "Walk-in sales — Monday", date: new Date() });
+  await storage.createTransaction({ employerId: iceCream.id, type: "revenue", category: "Walk-in Sales", amount: 28500, description: "Walk-in sales — Tuesday", date: new Date() });
+  await storage.createTransaction({ employerId: iceCream.id, type: "expense", category: "Supplies", amount: 8500, description: "Cream & dairy restock", date: new Date() });
+  await storage.createTransaction({ employerId: iceCream.id, type: "expense", category: "Utilities", amount: 3200, description: "Electric bill", date: new Date() });
+
+  // === LEGACY EMPLOYER ACCOUNTS ===
+  const emp_legacy = await storage.createUser({ username: "logistics_inc", password: hashedPw, role: "employer" });
+  await storage.createEmployerProfile({
+    userId: emp_legacy.id,
     companyName: "Swift Logistics",
     industry: "Logistics",
     country: "United States",
     location: "Illinois",
+    businessType: "general",
+    enabledModules: ["field_service", "finances", "team"],
     feedToken: crypto.randomBytes(16).toString('hex'),
-  });
-
-  const emp2 = await storage.createUser({ username: "care_plus", password: hashedPw, role: "employer" });
-  await storage.createEmployerProfile({
-    userId: emp2.id,
-    companyName: "CarePlus Home Health",
-    industry: "Healthcare",
-    country: "United States",
-    location: "Arizona",
-    feedToken: crypto.randomBytes(16).toString('hex'),
-  });
-
-  await storage.createJob({
-    employerId: emp1.id,
-    title: "CDL-A Truck Driver",
-    description: "Regional route, home weekends. Clean driving record required.",
-    industry: "Logistics",
-    employmentType: "full-time",
-    location: "Illinois",
-    city: "Chicago",
-    payMin: 60000,
-    payMax: 80000,
-    requiredCertifications: ["CDL-A"],
-    status: "OPEN"
-  });
-
-  const job2 = await storage.createJob({
-    employerId: emp2.id,
-    title: "Certified Nursing Assistant (CNA)",
-    description: "In-home care for seniors. Flexible shifts.",
-    industry: "Healthcare",
-    employmentType: "part-time",
-    location: "Arizona",
-    city: "Phoenix",
-    payMin: 35000,
-    payMax: 45000,
-    requiredCertifications: ["CNA", "CPR"],
-    status: "OPEN"
-  });
-
-  const worker1 = await storage.createUser({ username: "driver_dave", password: hashedPw, role: "worker" });
-  await storage.createWorkerProfile({
-    userId: worker1.id,
-    name: "Dave Miller",
-    phone: "555-0101",
-    location: "Chicago, IL",
-    roles: ["Truck Driver"],
-    experienceYears: 5,
-    certifications: ["CDL-A"],
-    availability: "Full-time"
-  });
-
-  const worker2 = await storage.createUser({ username: "nurse_sarah", password: hashedPw, role: "worker" });
-  await storage.createWorkerProfile({
-    userId: worker2.id,
-    name: "Sarah Jones",
-    phone: "555-0102",
-    location: "Phoenix, AZ",
-    roles: ["CNA", "Caregiver"],
-    experienceYears: 3,
-    certifications: ["CNA", "CPR"],
-    availability: "Part-time"
-  });
-
-  await db.insert(applications).values({
-    jobId: job2.id,
-    workerId: worker2.id,
-    status: "New",
-    fitScore: 85,
-    notes: "Looks like a great fit."
   });
 
   console.log("Database seeded!");

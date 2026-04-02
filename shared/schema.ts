@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, real } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -7,7 +7,12 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull().default("worker"),
+  role: text("role").notNull().default("worker"), // owner | manager | employee | worker
+  name: text("name"),
+  email: text("email"),
+  phone: text("phone"),
+  businessId: integer("business_id"), // for employee accounts belonging to a business
+  status: text("status").notNull().default("active"), // active | inactive
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -20,6 +25,7 @@ export const employerProfiles = pgTable("employer_profiles", {
   country: text("country").notNull().default(""),
   location: text("location").notNull(),
   feedToken: text("feed_token"),
+  businessType: text("business_type").default("general"), // general | field_service | product | both
   enabledModules: text("enabled_modules").array(),
   customFields: jsonb("custom_fields"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -106,11 +112,12 @@ export const tasks = pgTable("tasks", {
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
   employerId: integer("employer_id").notNull(),
-  type: text("type").notNull(),
+  type: text("type").notNull(), // revenue | expense
   category: text("category").notNull(),
-  amount: integer("amount").notNull(),
+  amount: integer("amount").notNull(), // in cents
   description: text("description"),
   date: timestamp("date").defaultNow(),
+  receiptPhotoUrl: text("receipt_photo_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -175,6 +182,66 @@ export const scheduleShifts = pgTable("schedule_shifts", {
   notes: text("notes"),
   status: text("status").notNull().default("scheduled"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === FIELD SERVICE MODULE ===
+
+export const serviceJobs = pgTable("service_jobs", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull(), // employer user id
+  title: text("title").notNull(),
+  clientName: text("client_name").notNull(),
+  serviceAddress: text("service_address").notNull(),
+  scheduledDate: text("scheduled_date").notNull(), // YYYY-MM-DD
+  scheduledTime: text("scheduled_time"), // HH:MM
+  assignedTo: integer("assigned_to"), // user id of employee
+  notes: text("notes"),
+  status: text("status").notNull().default("unassigned"), // unassigned | assigned | in_progress | completed
+  priority: text("priority").notNull().default("medium"), // low | medium | high
+  keyTrackingEnabled: boolean("key_tracking_enabled").notNull().default(false),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const jobPhotos = pgTable("job_photos", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull(),
+  userId: integer("user_id").notNull(),
+  photoUrl: text("photo_url").notNull(), // base64 data URL or server path
+  photoType: text("photo_type").notNull(), // checkin | checkout | key_pickup | key_return
+  note: text("note"),
+  takenAt: timestamp("taken_at").defaultNow(),
+});
+
+// === PRODUCT COSTING MODULE ===
+
+export const ingredients = pgTable("ingredients", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull(),
+  name: text("name").notNull(),
+  unit: text("unit").notNull(), // oz, lb, gallon, liter, each, etc.
+  costPerUnit: real("cost_per_unit").notNull(), // dollars, floating point
+  supplier: text("supplier"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"),
+  sellingPrice: real("selling_price"), // dollars, nullable until set
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const productIngredients = pgTable("product_ingredients", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  ingredientId: integer("ingredient_id").notNull(),
+  quantityPerUnit: real("quantity_per_unit").notNull(), // how many units of ingredient per unit of product
 });
 
 // === RELATIONS ===
@@ -254,6 +321,32 @@ export const scheduleShiftsRelations = relations(scheduleShifts, ({ one }) => ({
   assignee: one(staff, { fields: [scheduleShifts.staffId], references: [staff.id] }),
 }));
 
+export const serviceJobsRelations = relations(serviceJobs, ({ one, many }) => ({
+  business: one(users, { fields: [serviceJobs.businessId], references: [users.id] }),
+  employee: one(users, { fields: [serviceJobs.assignedTo], references: [users.id] }),
+  photos: many(jobPhotos),
+}));
+
+export const jobPhotosRelations = relations(jobPhotos, ({ one }) => ({
+  job: one(serviceJobs, { fields: [jobPhotos.jobId], references: [serviceJobs.id] }),
+  user: one(users, { fields: [jobPhotos.userId], references: [users.id] }),
+}));
+
+export const ingredientsRelations = relations(ingredients, ({ one, many }) => ({
+  business: one(users, { fields: [ingredients.businessId], references: [users.id] }),
+  productIngredients: many(productIngredients),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  business: one(users, { fields: [products.businessId], references: [users.id] }),
+  productIngredients: many(productIngredients),
+}));
+
+export const productIngredientsRelations = relations(productIngredients, ({ one }) => ({
+  product: one(products, { fields: [productIngredients.productId], references: [products.id] }),
+  ingredient: one(ingredients, { fields: [productIngredients.ingredientId], references: [ingredients.id] }),
+}));
+
 // === BASE SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -271,6 +364,11 @@ export const insertApplicationClickSchema = createInsertSchema(applicationClicks
 export const insertJobBoardPostingSchema = createInsertSchema(jobBoardPostings).omit({ id: true, createdAt: true });
 export const insertIndustryConfigSchema = createInsertSchema(industryConfigs).omit({ id: true, createdAt: true });
 export const insertScheduleShiftSchema = createInsertSchema(scheduleShifts).omit({ id: true, createdAt: true });
+export const insertServiceJobSchema = createInsertSchema(serviceJobs).omit({ id: true, createdAt: true, startedAt: true, completedAt: true });
+export const insertJobPhotoSchema = createInsertSchema(jobPhotos).omit({ id: true, takenAt: true });
+export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true });
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
+export const insertProductIngredientSchema = createInsertSchema(productIngredients).omit({ id: true });
 
 // === TYPES ===
 
@@ -319,6 +417,23 @@ export type InsertIndustryConfig = z.infer<typeof insertIndustryConfigSchema>;
 export type ScheduleShift = typeof scheduleShifts.$inferSelect;
 export type InsertScheduleShift = z.infer<typeof insertScheduleShiftSchema>;
 
+export type ServiceJob = typeof serviceJobs.$inferSelect;
+export type InsertServiceJob = z.infer<typeof insertServiceJobSchema>;
+
+export type JobPhoto = typeof jobPhotos.$inferSelect;
+export type InsertJobPhoto = z.infer<typeof insertJobPhotoSchema>;
+
+export type Ingredient = typeof ingredients.$inferSelect;
+export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
+
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+export type ProductIngredient = typeof productIngredients.$inferSelect;
+export type InsertProductIngredient = z.infer<typeof insertProductIngredientSchema>;
+
+// === COMPOSITE TYPES ===
+
 export type CreateJobRequest = Omit<InsertJob, "employerId">;
 export type CreateApplicationRequest = Omit<InsertApplication, "workerId" | "status" | "notes">;
 export type UpdateApplicationStatusRequest = { status: string; notes?: string };
@@ -329,6 +444,16 @@ export type ApplicationWithJob = Application & { job: Job & { employer: User & {
 
 export type StaffWithProfile = Staff & { workerProfile: WorkerProfile | null };
 export type TaskWithAssignee = Task & { assignee: StaffWithProfile | null };
+
+export type ServiceJobWithDetails = ServiceJob & {
+  assignedEmployee: User | null;
+  photos: JobPhoto[];
+};
+
+export type ProductWithIngredients = Product & {
+  productIngredients: (ProductIngredient & { ingredient: Ingredient })[];
+  costPerUnit: number;
+};
 
 export type AiSummaryRequest = { workerProfileId: number; jobId: number };
 export type AiSummaryResponse = { summary: string[] };

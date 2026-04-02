@@ -42,6 +42,7 @@ export function useLogin() {
       
       // Redirect based on role
       if (user.role === "employer") setLocation("/employer/dashboard");
+      else if (user.role === "employee") setLocation("/employee/jobs");
       else setLocation("/jobs");
     },
     onError: (error: Error) => {

@@ -4,6 +4,7 @@ import {
   staff, employmentHistory, tasks, transactions, jobBoardPostings,
   jobDistributions, integrationCredentials, applicationClicks,
   industryConfigs, scheduleShifts,
+  serviceJobs, jobPhotos, ingredients, products, productIngredients,
   type User, type InsertUser,
   type EmployerProfile, type InsertEmployerProfile,
   type WorkerProfile, type InsertWorkerProfile,
@@ -18,14 +19,22 @@ import {
   type IntegrationCredential, type InsertIntegrationCredential,
   type ApplicationClick, type InsertApplicationClick,
   type IndustryConfig, type InsertIndustryConfig,
-  type ScheduleShift, type InsertScheduleShift
+  type ScheduleShift, type InsertScheduleShift,
+  type ServiceJob, type InsertServiceJob,
+  type JobPhoto, type InsertJobPhoto,
+  type Ingredient, type InsertIngredient,
+  type Product, type InsertProduct,
+  type ProductIngredient, type InsertProductIngredient,
+  type ServiceJobWithDetails, type ProductWithIngredients
 } from "@shared/schema";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser & { role: string }): Promise<User>;
+  updateUser(id: number, updates: Partial<InsertUser>): Promise<User>;
+  getEmployeesByBusiness(businessId: number): Promise<User[]>;
 
   getEmployerProfile(userId: number): Promise<EmployerProfile | undefined>;
   createEmployerProfile(profile: InsertEmployerProfile): Promise<EmployerProfile>;
@@ -63,6 +72,7 @@ export interface IStorage {
 
   getTransactionsByEmployer(employerId: number, filters?: { type?: string; startDate?: Date; endDate?: Date }): Promise<Transaction[]>;
   createTransaction(t: InsertTransaction): Promise<Transaction>;
+  deleteTransaction(id: number): Promise<void>;
   getFinancialSummary(employerId: number): Promise<{ totalRevenue: number; totalExpenses: number; netIncome: number }>;
 
   getJobBoardPostings(jobId: number): Promise<JobBoardPosting[]>;
@@ -89,6 +99,31 @@ export interface IStorage {
   createShift(shift: InsertScheduleShift): Promise<ScheduleShift>;
   updateShift(id: number, updates: Partial<InsertScheduleShift>): Promise<ScheduleShift>;
   deleteShift(id: number): Promise<void>;
+
+  // Field Service Module
+  getServiceJobsByBusiness(businessId: number): Promise<ServiceJobWithDetails[]>;
+  getServiceJobsByEmployee(employeeId: number): Promise<ServiceJobWithDetails[]>;
+  getServiceJob(id: number): Promise<ServiceJobWithDetails | undefined>;
+  createServiceJob(j: InsertServiceJob): Promise<ServiceJob>;
+  updateServiceJob(id: number, updates: Partial<InsertServiceJob & { startedAt?: Date; completedAt?: Date }>): Promise<ServiceJob>;
+  deleteServiceJob(id: number): Promise<void>;
+  addJobPhoto(photo: InsertJobPhoto): Promise<JobPhoto>;
+  getJobPhotos(jobId: number): Promise<JobPhoto[]>;
+
+  // Product Costing Module
+  getIngredientsByBusiness(businessId: number): Promise<Ingredient[]>;
+  getIngredient(id: number): Promise<Ingredient | undefined>;
+  createIngredient(ing: InsertIngredient): Promise<Ingredient>;
+  updateIngredient(id: number, updates: Partial<InsertIngredient>): Promise<Ingredient>;
+  deleteIngredient(id: number): Promise<void>;
+
+  getProductsByBusiness(businessId: number): Promise<ProductWithIngredients[]>;
+  getProduct(id: number): Promise<ProductWithIngredients | undefined>;
+  createProduct(p: InsertProduct): Promise<Product>;
+  updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product>;
+  deleteProduct(id: number): Promise<void>;
+
+  setProductIngredients(productId: number, items: Omit<InsertProductIngredient, "productId">[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -105,6 +140,15 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser & { role: string }): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
+  }
+
+  async updateUser(id: number, updates: Partial<InsertUser>): Promise<User> {
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async getEmployeesByBusiness(businessId: number): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.businessId, businessId));
   }
 
   async getEmployerProfile(userId: number): Promise<EmployerProfile | undefined> {
@@ -146,11 +190,7 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
     if (filters?.industry) conditions.push(eq(jobs.industry, filters.industry));
     if (filters?.location) conditions.push(eq(jobs.location, filters.location));
-    
-    if (conditions.length > 0) {
-      return await db.select().from(jobs).where(and(...conditions));
-    }
-    
+    if (conditions.length > 0) return await db.select().from(jobs).where(and(...conditions));
     return await db.select().from(jobs);
   }
 
@@ -187,21 +227,16 @@ export class DatabaseStorage implements IStorage {
   async getApplicationsByEmployer(employerId: number): Promise<Application[]> {
     const employerJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.employerId, employerId));
     if (employerJobs.length === 0) return [];
-    const jobIds = employerJobs.map(j => j.id);
     const allApps: Application[] = [];
-    for (const jobId of jobIds) {
-      const apps = await db.select().from(applications).where(eq(applications.jobId, jobId));
+    for (const j of employerJobs) {
+      const apps = await db.select().from(applications).where(eq(applications.jobId, j.id));
       allApps.push(...apps);
     }
     return allApps;
   }
 
   async updateApplicationStatus(id: number, status: string, notes?: string): Promise<Application> {
-    const [updated] = await db
-      .update(applications)
-      .set({ status, notes })
-      .where(eq(applications.id, id))
-      .returning();
+    const [updated] = await db.update(applications).set({ status, notes }).where(eq(applications.id, id)).returning();
     return updated;
   }
 
@@ -216,11 +251,7 @@ export class DatabaseStorage implements IStorage {
 
   async createStaff(s: InsertStaff): Promise<Staff> {
     const [newStaff] = await db.insert(staff).values(s).returning();
-    await db.insert(employmentHistory).values({
-      staffId: newStaff.id,
-      action: "hired",
-      description: `Hired as ${s.position}`,
-    });
+    await db.insert(employmentHistory).values({ staffId: newStaff.id, action: "hired", description: `Hired as ${s.position}` });
     return newStaff;
   }
 
@@ -266,7 +297,6 @@ export class DatabaseStorage implements IStorage {
     if (filters?.type) conditions.push(eq(transactions.type, filters.type));
     if (filters?.startDate) conditions.push(gte(transactions.date, filters.startDate));
     if (filters?.endDate) conditions.push(lte(transactions.date, filters.endDate));
-    
     return await db.select().from(transactions).where(and(...conditions)).orderBy(desc(transactions.date));
   }
 
@@ -275,10 +305,14 @@ export class DatabaseStorage implements IStorage {
     return newTx;
   }
 
+  async deleteTransaction(id: number): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.id, id));
+  }
+
   async getFinancialSummary(employerId: number): Promise<{ totalRevenue: number; totalExpenses: number; netIncome: number }> {
     const allTx = await db.select().from(transactions).where(eq(transactions.employerId, employerId));
-    const totalRevenue = allTx.filter(t => t.type.toLowerCase() === "revenue").reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = allTx.filter(t => t.type.toLowerCase() === "expense").reduce((sum, t) => sum + t.amount, 0);
+    const totalRevenue = allTx.filter(t => t.type === "revenue").reduce((s, t) => s + t.amount, 0);
+    const totalExpenses = allTx.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
     return { totalRevenue, totalExpenses, netIncome: totalRevenue - totalExpenses };
   }
 
@@ -287,8 +321,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createJobBoardPosting(p: InsertJobBoardPosting): Promise<JobBoardPosting> {
-    const [newPosting] = await db.insert(jobBoardPostings).values(p).returning();
-    return newPosting;
+    const [posting] = await db.insert(jobBoardPostings).values(p).returning();
+    return posting;
   }
 
   async updateJobBoardPosting(id: number, updates: Partial<InsertJobBoardPosting>): Promise<JobBoardPosting> {
@@ -306,8 +340,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDistribution(d: InsertJobDistribution): Promise<JobDistribution> {
-    const [newDist] = await db.insert(jobDistributions).values(d).returning();
-    return newDist;
+    const [dist] = await db.insert(jobDistributions).values(d).returning();
+    return dist;
   }
 
   async updateDistribution(id: number, updates: Partial<InsertJobDistribution>): Promise<JobDistribution> {
@@ -368,6 +402,127 @@ export class DatabaseStorage implements IStorage {
 
   async deleteShift(id: number): Promise<void> {
     await db.delete(scheduleShifts).where(eq(scheduleShifts.id, id));
+  }
+
+  // === FIELD SERVICE MODULE ===
+
+  private async enrichServiceJob(job: ServiceJob): Promise<ServiceJobWithDetails> {
+    const photos = await db.select().from(jobPhotos).where(eq(jobPhotos.jobId, job.id));
+    let assignedEmployee: User | null = null;
+    if (job.assignedTo) {
+      const [emp] = await db.select().from(users).where(eq(users.id, job.assignedTo));
+      assignedEmployee = emp ?? null;
+    }
+    return { ...job, assignedEmployee, photos };
+  }
+
+  async getServiceJobsByBusiness(businessId: number): Promise<ServiceJobWithDetails[]> {
+    const rawJobs = await db.select().from(serviceJobs).where(eq(serviceJobs.businessId, businessId)).orderBy(desc(serviceJobs.createdAt));
+    return Promise.all(rawJobs.map(j => this.enrichServiceJob(j)));
+  }
+
+  async getServiceJobsByEmployee(employeeId: number): Promise<ServiceJobWithDetails[]> {
+    const rawJobs = await db.select().from(serviceJobs).where(eq(serviceJobs.assignedTo, employeeId)).orderBy(desc(serviceJobs.scheduledDate));
+    return Promise.all(rawJobs.map(j => this.enrichServiceJob(j)));
+  }
+
+  async getServiceJob(id: number): Promise<ServiceJobWithDetails | undefined> {
+    const [job] = await db.select().from(serviceJobs).where(eq(serviceJobs.id, id));
+    if (!job) return undefined;
+    return this.enrichServiceJob(job);
+  }
+
+  async createServiceJob(j: InsertServiceJob): Promise<ServiceJob> {
+    const [newJob] = await db.insert(serviceJobs).values(j).returning();
+    return newJob;
+  }
+
+  async updateServiceJob(id: number, updates: Partial<InsertServiceJob & { startedAt?: Date; completedAt?: Date }>): Promise<ServiceJob> {
+    const [updated] = await db.update(serviceJobs).set(updates as any).where(eq(serviceJobs.id, id)).returning();
+    return updated;
+  }
+
+  async deleteServiceJob(id: number): Promise<void> {
+    await db.delete(jobPhotos).where(eq(jobPhotos.jobId, id));
+    await db.delete(serviceJobs).where(eq(serviceJobs.id, id));
+  }
+
+  async addJobPhoto(photo: InsertJobPhoto): Promise<JobPhoto> {
+    const [newPhoto] = await db.insert(jobPhotos).values(photo).returning();
+    return newPhoto;
+  }
+
+  async getJobPhotos(jobId: number): Promise<JobPhoto[]> {
+    return await db.select().from(jobPhotos).where(eq(jobPhotos.jobId, jobId));
+  }
+
+  // === PRODUCT COSTING MODULE ===
+
+  async getIngredientsByBusiness(businessId: number): Promise<Ingredient[]> {
+    return await db.select().from(ingredients).where(eq(ingredients.businessId, businessId)).orderBy(desc(ingredients.createdAt));
+  }
+
+  async getIngredient(id: number): Promise<Ingredient | undefined> {
+    const [ing] = await db.select().from(ingredients).where(eq(ingredients.id, id));
+    return ing;
+  }
+
+  async createIngredient(ing: InsertIngredient): Promise<Ingredient> {
+    const [newIng] = await db.insert(ingredients).values(ing).returning();
+    return newIng;
+  }
+
+  async updateIngredient(id: number, updates: Partial<InsertIngredient>): Promise<Ingredient> {
+    const [updated] = await db.update(ingredients).set(updates).where(eq(ingredients.id, id)).returning();
+    return updated;
+  }
+
+  async deleteIngredient(id: number): Promise<void> {
+    await db.delete(productIngredients).where(eq(productIngredients.ingredientId, id));
+    await db.delete(ingredients).where(eq(ingredients.id, id));
+  }
+
+  private async enrichProduct(p: Product): Promise<ProductWithIngredients> {
+    const pis = await db.select().from(productIngredients).where(eq(productIngredients.productId, p.id));
+    const enriched = await Promise.all(pis.map(async pi => {
+      const [ing] = await db.select().from(ingredients).where(eq(ingredients.id, pi.ingredientId));
+      return { ...pi, ingredient: ing };
+    }));
+    const costPerUnit = enriched.reduce((sum, pi) => sum + (pi.ingredient?.costPerUnit ?? 0) * pi.quantityPerUnit, 0);
+    return { ...p, productIngredients: enriched, costPerUnit };
+  }
+
+  async getProductsByBusiness(businessId: number): Promise<ProductWithIngredients[]> {
+    const rawProducts = await db.select().from(products).where(eq(products.businessId, businessId)).orderBy(desc(products.createdAt));
+    return Promise.all(rawProducts.map(p => this.enrichProduct(p)));
+  }
+
+  async getProduct(id: number): Promise<ProductWithIngredients | undefined> {
+    const [p] = await db.select().from(products).where(eq(products.id, id));
+    if (!p) return undefined;
+    return this.enrichProduct(p);
+  }
+
+  async createProduct(p: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(p).returning();
+    return newProduct;
+  }
+
+  async updateProduct(id: number, updates: Partial<InsertProduct>): Promise<Product> {
+    const [updated] = await db.update(products).set(updates).where(eq(products.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    await db.delete(productIngredients).where(eq(productIngredients.productId, id));
+    await db.delete(products).where(eq(products.id, id));
+  }
+
+  async setProductIngredients(productId: number, items: Omit<InsertProductIngredient, "productId">[]): Promise<void> {
+    await db.delete(productIngredients).where(eq(productIngredients.productId, productId));
+    if (items.length > 0) {
+      await db.insert(productIngredients).values(items.map(i => ({ ...i, productId })));
+    }
   }
 }
 
