@@ -15,8 +15,8 @@ export default function Home() {
             transition={{ duration: 0.5 }}
             className="text-4xl md:text-6xl lg:text-7xl font-display font-bold text-slate-900 tracking-tight mb-6"
           >
-            Making Work <br className="hidden md:block" />
-            <span className="text-primary">Seamless</span>
+            Making Work <span className="text-primary">Seamless</span> <br className="hidden md:block" />
+            for Businesses
           </motion.h1>
           
           <motion.div 
