@@ -102,7 +102,7 @@ export default function AuthPage() {
                                 <RadioGroupItem value="worker" />
                               </FormControl>
                               <FormLabel className="font-normal cursor-pointer flex-1">
-                                Worker <span className="block text-xs text-muted-foreground">Looking for reliable jobs</span>
+                                Worker
                               </FormLabel>
                             </FormItem>
                             <FormItem className="flex items-center space-x-3 space-y-0 p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
@@ -110,7 +110,7 @@ export default function AuthPage() {
                                 <RadioGroupItem value="employer" />
                               </FormControl>
                               <FormLabel className="font-normal cursor-pointer flex-1">
-                                Employer <span className="block text-xs text-muted-foreground">Hiring reliable talent</span>
+                                Employer
                               </FormLabel>
                             </FormItem>
                           </RadioGroup>
