@@ -19,15 +19,6 @@ export default function Home() {
             <span className="text-primary">Seamless</span>
           </motion.h1>
           
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10"
-          >
-            OptimaVia connects labor-critical industries with qualified candidates using intelligent scoring to predict reliability and job fit.
-          </motion.p>
-          
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
