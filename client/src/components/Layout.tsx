@@ -67,7 +67,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex h-14 items-center justify-between">
               <Link href="/" className="flex items-center gap-2 font-bold text-lg text-primary">
                 <Building2 className="h-5 w-5" />
-                <span>OptimaVia<sub className="text-xs font-normal">Gen</sub></span>
+                <span>OptimaVia<sub className="text-xs font-normal text-green-500 ml-0.5">Gen</sub></span>
               </Link>
               <div className="flex items-center gap-2">
                 {isLoggedIn ? (
