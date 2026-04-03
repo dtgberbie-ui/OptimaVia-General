@@ -37,7 +37,7 @@ export default function AuthPage() {
       <Card className="w-full max-w-md shadow-xl border-t-4 border-t-primary">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-display">Welcome to OptimaVia</CardTitle>
-          <CardDescription>Sign in to manage your workforce or find jobs.</CardDescription>
+          <CardDescription>Run your operations from one place</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
