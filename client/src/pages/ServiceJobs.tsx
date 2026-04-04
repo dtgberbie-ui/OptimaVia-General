@@ -58,7 +58,7 @@ export default function ServiceJobs() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
     clientName: "", serviceAddress: "", scheduledDate: "", scheduledTime: "",
-    notes: "", assignedTo: "", priority: "medium", keyTrackingEnabled: false,
+    notes: "", assignedTo: "none", priority: "medium", keyTrackingEnabled: false,
   });
 
   const { data: jobs, isLoading } = useQuery<ServiceJob[]>({
@@ -74,7 +74,7 @@ export default function ServiceJobs() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/service-jobs"] });
       setShowCreate(false);
-      setForm({ clientName: "", serviceAddress: "", scheduledDate: "", scheduledTime: "", notes: "", assignedTo: "", priority: "medium", keyTrackingEnabled: false });
+      setForm({ clientName: "", serviceAddress: "", scheduledDate: "", scheduledTime: "", notes: "", assignedTo: "none", priority: "medium", keyTrackingEnabled: false });
       toast({ title: "Job created successfully" });
     },
     onError: () => toast({ title: "Failed to create job", variant: "destructive" }),
@@ -90,7 +90,7 @@ export default function ServiceJobs() {
     createMutation.mutate({
       ...form,
       title: "Service Job",
-      assignedTo: form.assignedTo ? parseInt(form.assignedTo) : null,
+      assignedTo: form.assignedTo && form.assignedTo !== "none" ? parseInt(form.assignedTo) : null,
     });
   }
 
@@ -198,7 +198,7 @@ export default function ServiceJobs() {
               <Select value={form.assignedTo} onValueChange={v => setForm(f => ({ ...f, assignedTo: v }))}>
                 <SelectTrigger data-testid="select-assign-to"><SelectValue placeholder="Choose employee..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="none">Unassigned</SelectItem>
                   {employees?.map(e => (
                     <SelectItem key={e.id} value={String(e.id)}>{e.name || e.username}</SelectItem>
                   ))}
