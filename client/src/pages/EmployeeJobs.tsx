@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useUser } from "@/hooks/use-auth";
-import { MapPin, Clock, ChevronRight, CheckCircle, Play, AlertCircle } from "lucide-react";
+import { MapPin, Clock, ChevronRight, CheckCircle, Play, AlertCircle, Briefcase } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+type EmployerProfile = { companyName: string };
 
 type ServiceJob = {
   id: number; clientName: string; serviceAddress: string;
@@ -29,8 +31,25 @@ function StatusIcon({ status }: { status: string }) {
   return <AlertCircle className="h-4 w-4 text-yellow-600" />;
 }
 
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function EmployeeJobs() {
   const { data: user } = useUser();
+
+  const { data: employerProfile } = useQuery<EmployerProfile>({
+    queryKey: ["/api/employer/profile", user?.businessId],
+    enabled: !!user?.businessId,
+    queryFn: async () => {
+      const res = await fetch(`/api/employer/profile/${user?.businessId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
 
   const { data: jobs, isLoading } = useQuery<ServiceJob[]>({
     queryKey: ["/api/service-jobs"],
@@ -41,12 +60,22 @@ export default function EmployeeJobs() {
   const upcomingJobs = jobs?.filter(j => j.scheduledDate > today) ?? [];
   const completedJobs = jobs?.filter(j => j.status === "completed") ?? [];
 
+  const displayName = user?.name || user?.username || "there";
+
   return (
     <div className="px-4 py-5 max-w-lg mx-auto space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900" data-testid="heading-employee-jobs">My Jobs</h1>
-        <p className="text-sm text-slate-500 mt-0.5">
+      <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-2xl p-5 text-white" data-testid="employee-welcome-banner">
+        <p className="text-indigo-200 text-sm font-medium">{greeting()},</p>
+        <h1 className="text-2xl font-bold mt-0.5" data-testid="heading-employee-jobs">{displayName}</h1>
+        {employerProfile?.companyName && (
+          <div className="flex items-center gap-1.5 mt-2 text-indigo-200 text-sm">
+            <Briefcase className="h-3.5 w-3.5" />
+            <span>{employerProfile.companyName}</span>
+          </div>
+        )}
+        <p className="text-indigo-200 text-xs mt-2">
           {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          {todayJobs.length > 0 && ` · ${todayJobs.length} job${todayJobs.length > 1 ? "s" : ""} today`}
         </p>
       </div>
 
