@@ -72,6 +72,10 @@ Preferred communication style: Simple, everyday language.
 - **Migrations:** `npm run db:push`
 - **Key Tables:** users, employer_profiles, service_jobs, job_photos, ingredients, products, product_ingredients, transactions
 
+### Dashboard Features
+- **Filta (Field Service):** Greeting + business name, 4 stat cards (Revenue, Expenses, Profit, Active Jobs), Today's Jobs list with worker avatars and status badges, quick action buttons (New Job, View Team), unassigned jobs alert banner
+- **Sweet Scoops (Product Costing):** Greeting + business name, 4 stat cards (Revenue, Expenses, Profit, Avg Margin %), Product Margins table with cost/price/margin per product, Recent Expenses list, quick action buttons (Log Sale, Log Expense)
+
 ### Key Pages & Routes
 ```
 Employer (business owner):

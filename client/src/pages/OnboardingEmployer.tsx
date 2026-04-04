@@ -90,6 +90,8 @@ export default function OnboardingEmployer() {
       companySize: "",
       country: "",
       location: "",
+      email: "",
+      phone: "",
     },
   });
 
@@ -271,6 +273,34 @@ export default function OnboardingEmployer() {
                       </FormItem>
                     )}
                   />
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="hello@business.com" {...field} data-testid="input-business-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Phone</FormLabel>
+                          <FormControl>
+                            <Input type="tel" placeholder="555-0100" {...field} data-testid="input-business-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <Button type="submit" className="w-full" data-testid="button-next-step">
                     Next: Choose Your Tools →
                   </Button>

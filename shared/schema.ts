@@ -24,6 +24,8 @@ export const employerProfiles = pgTable("employer_profiles", {
   companySize: text("company_size"),
   country: text("country").notNull().default(""),
   location: text("location").notNull(),
+  email: text("email"),
+  phone: text("phone"),
   feedToken: text("feed_token"),
   businessType: text("business_type").default("general"), // general | field_service | product | both
   enabledModules: text("enabled_modules").array(),
