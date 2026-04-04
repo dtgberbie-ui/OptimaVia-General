@@ -1,0 +1,405 @@
+Build the login screen and the main dashboard for OptimaVia General. This is a mobile-first small business operations platform. The app serves different business types using the same core but with different modules toggled on. I have two initial business types:
+
+1. **Field Service** (e.g., Filta Raleigh — dispatches workers to client locations)
+2. **Product-Based** (e.g., an ice cream shop — tracks costs, recipes, pricing)
+
+I need the login page and the dashboard that adapts based on the business type.
+
+---
+
+## Tech Stack
+
+- React + TypeScript
+- Tailwind CSS
+- Node.js + Express backend
+- PostgreSQL (use Replit's built-in DB or Drizzle ORM)
+- Mobile-first responsive design (optimize for 375px phone width, scale up gracefully)
+
+---
+
+## Brand & Design System
+
+### Colors
+- **Primary brand color:** `#0F6E56` (teal green) — used for primary buttons, active nav items, links, accent text, profit/positive numbers
+- **Primary button text:** white on `#0F6E56` background
+- **Secondary button:** transparent background with `1px solid #d1d5db` border, dark text
+- **Positive values (revenue, profit, margin):** `#0F6E56`
+- **Negative values / alerts:** use amber `#854F0B` text on `#FAEEDA` background for warnings, red `#A32D2D` for losses
+- **Background:** white `#FFFFFF` for main, `#F9FAFB` for surface cards (stat cards)
+- **Text primary:** `#111827`
+- **Text secondary / muted:** `#6B7280`
+- **Text tertiary / hints:** `#9CA3AF`
+- **Borders:** `#E5E7EB` (light gray, use `border` with `1px solid`)
+
+### Typography
+- Use system font stack: `-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`
+- Page greeting: 18px, font-weight 600
+- Sub-greeting (business name + date): 13px, muted color
+- Stat card label: 11px, muted, uppercase or font-weight 500
+- Stat card value: 20px, font-weight 600
+- Section headings: 14px, font-weight 600
+- Body / list text: 13–14px
+- Nav bar labels: 11px
+
+### Spacing & Radius
+- Card border-radius: 8px
+- Button border-radius: 8px
+- Phone-width padding: 20px horizontal
+- Stat card grid gap: 10px
+- Card internal padding: 12px 14px
+
+---
+
+## Screen 1: Login Page
+
+### Layout (centered vertically on screen)
+1. **App logo/icon** at top center:
+   - 64x64px rounded square (border-radius: 16px), background `#0F6E56`
+   - White checkmark icon inside (simple SVG path)
+   - Centered horizontally
+
+2. **App name** below the icon:
+   - "OptimaVia" — 26px, font-weight 600, primary text color
+   - "GENERAL" — 14px, color `#0F6E56`, font-weight 500, letter-spacing 1.5px, uppercase
+   - Below that: tagline "Run your operations from one place. Simple tools for real businesses." — 14px, muted color, centered, line-height 1.5
+
+3. **Email field:**
+   - Label "Email" above (12px, muted, font-weight 500)
+   - Input with placeholder "you@business.com"
+   - Border: 1px solid `#D1D5DB`, border-radius 8px, padding 12px 14px
+
+4. **Password field:**
+   - Label "Password" above
+   - Input with placeholder dots, eye icon on the right side to toggle visibility
+   - "Forgot password?" link below, right-aligned, 13px, color `#0F6E56`, font-weight 500
+
+5. **Sign in button:**
+   - Full width, background `#0F6E56`, white text, padding 14px, border-radius 8px, font-weight 500, 15px
+
+6. **Divider:**
+   - Horizontal line with "or" text centered in the middle (thin gray line on each side)
+
+7. **Google sign in button:**
+   - Full width, white/transparent background, 1px border, Google "G" logo icon on the left, text "Continue with Google", 15px, font-weight 500
+
+8. **Footer:**
+   - At the bottom: "New to OptimaVia?" with "Create an account" link in `#0F6E56`
+
+### Login functionality
+- Email/password authentication
+- On successful login, redirect to the dashboard
+- Store JWT token for session
+- Role-based: `owner`, `manager`, `employee`
+- Each user belongs to a `business` which has a `type` field and `active_modules` array
+
+---
+
+## Screen 2: Dashboard (adapts by business type)
+
+After login, the user sees a dashboard. The dashboard structure is the same but the content adapts based on the business modules.
+
+### Shared structure (all business types see this)
+
+**Top section:**
+- Greeting: "Good morning, {firstName}" — 18px, font-weight 600
+- Sub-line: "{Business Name} — {Day of week}, {Month} {Day}" — 13px, muted
+
+**Alert bar (conditional):**
+- Only shows when there are active alerts/notifications
+- Amber background `#FAEEDA`, rounded 8px, padding 10px 14px
+- Warning triangle icon on the left (stroke color `#854F0B`)
+- Alert text in `#633806`, 12px
+- Example for field service: "Key not returned — Jake M. at Angus Barn (2h ago)"
+
+**Stat cards:**
+- 2x2 grid layout
+- Each card: background `#F9FAFB`, border-radius 8px, padding 12px 14px
+- Label on top (11px, muted, font-weight 500), value below (20px, font-weight 600)
+- Positive money values use color `#0F6E56`
+
+**Bottom navigation bar:**
+- Fixed at bottom of screen
+- 5 icons with labels below each
+- Active tab: color `#0F6E56`
+- Inactive tabs: muted gray `#9CA3AF`
+- Icons should be simple outline-style SVGs (like Lucide/Feather icons)
+
+### Dashboard variant A: Field Service business (Filta)
+
+**Stat cards show:**
+| Card | Label | Example Value |
+|------|-------|---------------|
+| Top-left | Revenue (Apr) | $8,420 (green) |
+| Top-right | Expenses (Apr) | $3,180 (default) |
+| Bottom-left | Active jobs | 6 (default) |
+| Bottom-right | Team in field | 3 / 5 (default) |
+
+**Section: "Today's jobs"**
+- Section heading with "View all" link on the right (12px, `#0F6E56`)
+- List of job cards, each card has:
+  - Top row: client/business name (14px, font-weight 500) + status badge on the right
+  - Status badges:
+    - "In progress" — background `#E1F5EE`, text `#085041`
+    - "Assigned" — background `#E6F1FB`, text `#0C447C`
+    - "Unassigned" — background `#FAEEDA`, text `#633806`
+  - Badge style: 11px, font-weight 500, padding 3px 8px, border-radius 8px
+  - Second row: address + scheduled time (12px, muted)
+  - Third row: small worker avatar circle (20px, initials inside, background `#E1F5EE`, text `#085041`, 9px font) + worker name (12px, muted)
+  - If unassigned: show "No worker assigned" in tertiary/hint color instead of avatar
+  - Cards have white background, 1px border `#E5E7EB`, border-radius 8px, padding 12px 14px, 8px margin between cards
+- Show 3 job cards on the dashboard (most recent/upcoming)
+
+**Quick actions:**
+- 2-column grid below the jobs
+- Each button: 1px border, border-radius 8px, padding 12px, centered text 13px font-weight 500
+- Left button: "+" icon (stroke `#0F6E56`) + "New job"
+- Right button: people icon (stroke `#0F6E56`) + "View team"
+
+**Bottom nav tabs:**
+| Tab | Icon | Label |
+|-----|------|-------|
+| 1 (active) | House | Home |
+| 2 | Calendar/clipboard | Jobs |
+| 3 | Dollar sign | Finances |
+| 4 | Person | Team |
+| 5 | Gear | More |
+
+### Dashboard variant B: Product-based business (Ice cream shop)
+
+**Stat cards show:**
+| Card | Label | Example Value |
+|------|-------|---------------|
+| Top-left | Revenue (Apr) | $2,160 (green) |
+| Top-right | Expenses (Apr) | $890 (default) |
+| Bottom-left | Profit (Apr) | $1,270 (green) |
+| Bottom-right | Avg margin | 58% (green) |
+
+**Section: "Product margins"**
+- Section heading with "View all" link on the right
+- List inside a bordered container (1px border, border-radius 8px)
+- Each product row:
+  - Left side: product name (13px, font-weight 500) + detail line below "Cost $X.XX — Sells $X.XX" (11px, muted)
+  - Right side: margin percentage (14px, font-weight 500, color `#0F6E56`)
+  - Rows separated by thin 1px border lines
+- Show 4 products:
+  - Vanilla waffle cone — Cost $1.82, Sells $4.50 — 60%
+  - Chocolate sundae — Cost $2.45, Sells $5.75 — 57%
+  - Strawberry milkshake — Cost $2.10, Sells $4.25 — 51%
+  - Cookie dough pint — Cost $4.20, Sells $8.00 — 48%
+
+**Section: "Recent expenses"**
+- Same bordered container style as product margins
+- Each expense row:
+  - Left side: expense name (13px, font-weight 500) + category + date below (11px, muted)
+  - Right side: amount (14px, font-weight 500, default text color)
+- Show 3 expenses:
+  - Cream (5 gal) — Supplies, Apr 3 — $22.50
+  - Waffle cones (case) — Supplies, Apr 2 — $30.00
+  - Electric bill — Utilities, Apr 1 — $185.00
+
+**Quick actions:**
+- 2-column grid
+- Left button: "+" icon + "Log sale"
+- Right button: download/arrow icon + "Log expense"
+
+**Bottom nav tabs:**
+| Tab | Icon | Label |
+|-----|------|-------|
+| 1 (active) | House | Home |
+| 2 | Shopping bag | Products |
+| 3 | Dollar sign | Finances |
+| 4 | Person | Team |
+| 5 | Gear | More |
+
+---
+
+## Data Model (minimum needed for these screens)
+
+```sql
+-- Businesses
+CREATE TABLE businesses (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL, -- 'field_service' or 'product'
+  active_modules TEXT[] DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Users
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'employee', -- 'owner', 'manager', 'employee'
+  status VARCHAR(20) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Jobs (for field service)
+CREATE TABLE jobs (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  title VARCHAR(255),
+  client_name VARCHAR(255),
+  location_address TEXT,
+  scheduled_date DATE,
+  scheduled_time TIME,
+  assigned_to INTEGER REFERENCES users(id),
+  status VARCHAR(20) DEFAULT 'unassigned', -- 'unassigned', 'assigned', 'in_progress', 'completed'
+  priority VARCHAR(10) DEFAULT 'medium',
+  key_tracking_enabled BOOLEAN DEFAULT false,
+  notes TEXT,
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Expenses
+CREATE TABLE expenses (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  user_id INTEGER REFERENCES users(id),
+  amount DECIMAL(10,2) NOT NULL,
+  category VARCHAR(100),
+  description VARCHAR(255),
+  date DATE NOT NULL,
+  receipt_photo_url TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Revenue
+CREATE TABLE revenues (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  user_id INTEGER REFERENCES users(id),
+  amount DECIMAL(10,2) NOT NULL,
+  source VARCHAR(255),
+  product_id INTEGER,
+  date DATE NOT NULL,
+  note TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Ingredients (for product costing)
+CREATE TABLE ingredients (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  name VARCHAR(255) NOT NULL,
+  unit VARCHAR(50),
+  cost_per_unit DECIMAL(10,4),
+  supplier VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Products
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  category VARCHAR(100),
+  selling_price DECIMAL(10,2),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Product ingredients (recipe)
+CREATE TABLE product_ingredients (
+  id SERIAL PRIMARY KEY,
+  product_id INTEGER REFERENCES products(id),
+  ingredient_id INTEGER REFERENCES ingredients(id),
+  quantity_per_unit DECIMAL(10,4)
+);
+
+-- Notifications
+CREATE TABLE notifications (
+  id SERIAL PRIMARY KEY,
+  business_id INTEGER REFERENCES businesses(id),
+  user_id INTEGER REFERENCES users(id),
+  message TEXT NOT NULL,
+  type VARCHAR(50),
+  read BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+## Seed Data (for demo/testing)
+
+Create the following seed data so the dashboards have content immediately:
+
+### Business 1: Filta Raleigh
+- Business: name "Filta Raleigh", type "field_service", active_modules: ["field_service"]
+- Owner: Marcus Johnson, marcus@filtaraleigh.com, password "demo123", role "owner"
+- Employees:
+  - Jake Morrison, jake@filtaraleigh.com, role "employee"
+  - Tina Reyes, tina@filtaraleigh.com, role "employee"
+  - Dave Chen, dave@filtaraleigh.com, role "employee"
+  - Lisa Park, lisa@filtaraleigh.com, role "employee"
+  - Sam Williams, sam@filtaraleigh.com, role "employee"
+- Jobs for today:
+  - Angus Barn, 4800 Falls of Neuse Rd Raleigh NC, 10:00 AM, assigned to Jake, status "in_progress", key_tracking ON
+  - Second Empire, 330 Hillsborough St Raleigh NC, 1:00 PM, assigned to Tina, status "assigned"
+  - Bida Manda, 222 S Blount St Raleigh NC, 3:30 PM, unassigned
+  - Poole's Diner, 426 S McDowell St Raleigh NC, tomorrow 9:00 AM, assigned to Dave, status "assigned"
+  - Brewery Bhavana, 218 S Blount St Raleigh NC, tomorrow 11:00 AM, assigned to Lisa, status "assigned"
+  - Vidrio, 500 Glenwood Ave Raleigh NC, tomorrow 2:00 PM, unassigned
+- Revenue entries for April: $2,400 (Apr 1), $1,800 (Apr 2), $2,100 (Apr 3), $2,120 (Apr 4)
+- Expense entries: Fuel $120 (Apr 1), Oil filters $450 (Apr 2), Vehicle maintenance $280 (Apr 3), Supplies $85 (Apr 4)
+- Notification: "Key not returned — Jake M. at Angus Barn" type "key_alert", unread, created 2 hours ago
+
+### Business 2: Sweet Scoops (Ice Cream Shop)
+- Business: name "Sweet Scoops", type "product", active_modules: ["product_costing"]
+- Owner: Sarah Mitchell, sarah@sweetscoops.com, password "demo123", role "owner"
+- Employees:
+  - Amy Chen, amy@sweetscoops.com, role "employee"
+  - Jordan Lee, jordan@sweetscoops.com, role "employee"
+- Ingredients:
+  - Heavy cream, gallon, $4.50/gallon, "Dairy Fresh Farms"
+  - Sugar, lb, $0.80/lb, "US Foods"
+  - Vanilla extract, oz, $0.75/oz, "US Foods"
+  - Chocolate syrup, oz, $0.35/oz, "Hershey's"
+  - Waffle cones, each, $0.15/each, "Joy Cone Co"
+  - Strawberries, lb, $3.20/lb, "Local Farm"
+  - Cookie dough bits, oz, $0.45/oz, "David's Cookies"
+  - Whole milk, gallon, $3.80/gallon, "Dairy Fresh Farms"
+  - Whipped cream, oz, $0.20/oz, "Dairy Fresh Farms"
+  - Sprinkles, oz, $0.30/oz, "US Foods"
+- Products with recipes:
+  - Vanilla waffle cone (selling price $4.50): cream 3oz, sugar 0.5oz, vanilla 0.25oz, waffle cone 1 each → cost ~$1.82
+  - Chocolate sundae (selling price $5.75): cream 4oz, sugar 0.5oz, chocolate syrup 2oz, whipped cream 1oz, sprinkles 0.5oz → cost ~$2.45
+  - Strawberry milkshake (selling price $4.25): whole milk 6oz, cream 2oz, strawberries 1.5oz, sugar 0.3oz → cost ~$2.10
+  - Cookie dough pint (selling price $8.00): cream 8oz, sugar 1oz, vanilla 0.5oz, cookie dough bits 4oz → cost ~$4.20
+- Revenue entries for April: $580 (Apr 1), $620 (Apr 2), $540 (Apr 3), $420 (Apr 4)
+- Expense entries: Cream 5gal $22.50 supplies (Apr 3), Waffle cones case $30 supplies (Apr 2), Electric bill $185 utilities (Apr 1), Sugar 25lb $20 supplies (Apr 1), Strawberries 10lb $32 supplies (Apr 2)
+
+---
+
+## Routing
+
+```
+/login          → Login page
+/dashboard      → Main dashboard (redirects to /login if not authenticated)
+```
+
+The dashboard page checks the logged-in user's business type and active_modules to decide which variant to render (field service stats + jobs list OR product margins + expenses list). Use the same React component with conditional rendering based on the business type — NOT two separate pages.
+
+---
+
+## Important Implementation Notes
+
+- **Mobile-first:** Design for 375px width. The dashboard should look great on a phone. Use max-width container centered on desktop but don't worry about desktop optimization yet.
+- **The bottom nav bar** should be fixed at the bottom of the viewport so it's always accessible as the user scrolls.
+- **Stat card values** should be computed from actual database records (sum of revenue entries, sum of expense entries for the current month). For "Active jobs" count jobs that are not "completed". For "Team in field" count employees with at least one "in_progress" job today. For "Avg margin" compute the average margin across all products.
+- **Product margins** should be calculated from the product_ingredients join — sum(ingredient.cost_per_unit * product_ingredient.quantity_per_unit) for each product, then compute margin as (selling_price - cost) / selling_price * 100.
+- **The alert bar** should pull from unread notifications of type "key_alert". Only show it if there are unread alerts.
+- **"Today's jobs"** filters jobs where scheduled_date = today, sorted by scheduled_time ascending. Show max 3 on dashboard.
+- **"Recent expenses"** shows the 3 most recent expense entries for the business.
+- **Time-based greeting:** "Good morning" before noon, "Good afternoon" before 5pm, "Good evening" after 5pm.
+- **Date display:** Show the current actual date, formatted like "Thursday, Apr 4".
+- **All monetary values** should be formatted with dollar sign and two decimal places (except stat card totals which can be rounded to whole numbers).
+- **Percentage values** should be rounded to whole numbers (no decimal).
