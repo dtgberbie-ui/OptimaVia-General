@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, User, Phone, Mail, UserCheck, UserX, Loader2, Users } from "lucide-react";
+import { Plus, Phone, Mail, Loader2, Users, Info, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,9 @@ function initials(e: Employee) {
 export default function TeamManagement() {
   const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", username: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
+  const [addedLogin, setAddedLogin] = useState<{ handle: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { data: employees, isLoading } = useQuery<Employee[]>({
     queryKey: ["/api/business/employees"],
@@ -32,11 +34,10 @@ export default function TeamManagement() {
 
   const addMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/business/employees", data),
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/business/employees"] });
-      setShowAdd(false);
-      setForm({ name: "", email: "", phone: "", username: "", password: "" });
-      toast({ title: "Employee added" });
+      setAddedLogin({ handle: res.loginHandle ?? res.username, password: form.password });
+      setForm({ name: "", email: "", phone: "", password: "" });
     },
     onError: (err: any) => toast({ title: err?.message ?? "Failed to add employee", variant: "destructive" }),
   });
@@ -51,11 +52,28 @@ export default function TeamManagement() {
   });
 
   function handleAdd() {
-    if (!form.username || !form.password) {
-      toast({ title: "Username and password are required", variant: "destructive" });
+    if (!form.password) {
+      toast({ title: "A temporary password is required", variant: "destructive" });
+      return;
+    }
+    if (!form.name && !form.email) {
+      toast({ title: "Name or email is required", variant: "destructive" });
       return;
     }
     addMutation.mutate(form);
+  }
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function handleClose() {
+    setShowAdd(false);
+    setAddedLogin(null);
+    setCopied(false);
   }
 
   const active = employees?.filter(e => e.status !== "inactive") ?? [];
@@ -102,47 +120,80 @@ export default function TeamManagement() {
       )}
 
       {/* Add Employee Dialog */}
-      <Dialog open={showAdd} onOpenChange={v => !v && setShowAdd(false)}>
+      <Dialog open={showAdd} onOpenChange={v => !v && handleClose()}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
+            <DialogTitle>{addedLogin ? "Employee Added" : "Add Team Member"}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Full Name</Label>
-              <Input placeholder="e.g. Jake Martinez" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="input-employee-name" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label>Email</Label>
-                <Input type="email" placeholder="jake@company.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} data-testid="input-employee-email" />
+
+          {addedLogin ? (
+            /* ── Success: show login credentials ── */
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
+                <p className="font-semibold mb-1">Account created successfully!</p>
+                <p className="text-xs text-green-700">Share these credentials with your employee so they can sign in.</p>
               </div>
-              <div>
-                <Label>Phone</Label>
-                <Input type="tel" placeholder="555-0101" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} data-testid="input-employee-phone" />
-              </div>
-            </div>
-            <div className="border-t pt-3">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Login Credentials</p>
-              <div className="space-y-2">
-                <div>
-                  <Label>Username *</Label>
-                  <Input placeholder="e.g. jake_filta" value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} data-testid="input-employee-username" />
+              <div className="bg-slate-50 rounded-xl p-4 space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Login</span>
+                  <div className="flex items-center gap-2">
+                    <code className="font-mono text-slate-900 text-xs bg-white border rounded px-2 py-0.5">{addedLogin.handle}</code>
+                    <button onClick={() => handleCopy(`${addedLogin.handle}\nPassword: ${addedLogin.password}`)} className="text-slate-400 hover:text-primary" data-testid="button-copy-credentials">
+                      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <Label>Password *</Label>
-                  <Input type="password" placeholder="Temporary password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} data-testid="input-employee-password" />
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Password</span>
+                  <code className="font-mono text-slate-900 text-xs bg-white border rounded px-2 py-0.5">{addedLogin.password}</code>
                 </div>
               </div>
+              <p className="text-xs text-slate-400 flex items-start gap-1.5">
+                <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                They sign in at the app login page. They can change their password later.
+              </p>
+              <Button className="w-full" onClick={handleClose} data-testid="button-done-employee">Done</Button>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button onClick={handleAdd} disabled={addMutation.isPending} data-testid="button-save-employee">
-              {addMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Add Employee
-            </Button>
-          </DialogFooter>
+          ) : (
+            /* ── Form ── */
+            <>
+              <div className="space-y-3">
+                <div>
+                  <Label>Full Name</Label>
+                  <Input placeholder="e.g. Jake Martinez" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="input-employee-name" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Email <span className="text-slate-400 font-normal text-xs">(optional)</span></Label>
+                    <Input type="email" placeholder="jake@company.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} data-testid="input-employee-email" />
+                  </div>
+                  <div>
+                    <Label>Phone <span className="text-slate-400 font-normal text-xs">(optional)</span></Label>
+                    <Input type="tel" placeholder="555-0101" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} data-testid="input-employee-phone" />
+                  </div>
+                </div>
+                <div className="border-t pt-3">
+                  <div>
+                    <Label>Temporary Password *</Label>
+                    <Input type="password" placeholder="Set an initial password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} data-testid="input-employee-password" />
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2 flex items-start gap-1">
+                    <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                    {form.email
+                      ? "They'll sign in with their email address."
+                      : "A login handle will be generated from their name."}
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleClose}>Cancel</Button>
+                <Button onClick={handleAdd} disabled={addMutation.isPending} data-testid="button-save-employee">
+                  {addMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  Add Employee
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -742,13 +742,31 @@ Apply now at ${profile?.companyName || 'our company'}!`;
 
   app.post("/api/business/employees", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    const { name, email, phone, username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ message: "Username and password required" });
-    const existing = await storage.getUserByUsername(username);
-    if (existing) return res.status(400).json({ message: "Username already taken" });
+    const { name, email, phone, password } = req.body;
+    if (!password) return res.status(400).json({ message: "A temporary password is required" });
+
+    // Derive a login handle: use email if provided, otherwise slug from name
+    let loginHandle: string;
+    if (email && email.trim()) {
+      loginHandle = email.trim().toLowerCase();
+      const existingByEmail = await storage.getUserByEmail(loginHandle);
+      if (existingByEmail) return res.status(400).json({ message: "An account with that email already exists" });
+    } else {
+      if (!name) return res.status(400).json({ message: "Name or email is required" });
+      const base = name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+      const suffix = Math.floor(100 + Math.random() * 900);
+      loginHandle = `${base}_${suffix}`;
+      // Ensure unique
+      let attempt = loginHandle;
+      while (await storage.getUserByUsername(attempt)) {
+        attempt = `${base}_${Math.floor(100 + Math.random() * 900)}`;
+      }
+      loginHandle = attempt;
+    }
+
     const hashedPw = await hashPassword(password);
     const employee = await storage.createUser({
-      username,
+      username: loginHandle,
       password: hashedPw,
       role: "employee",
       name: name || null,
@@ -756,7 +774,7 @@ Apply now at ${profile?.companyName || 'our company'}!`;
       phone: phone || null,
       businessId: req.user.id,
     });
-    res.status(201).json(employee);
+    res.status(201).json({ ...employee, loginHandle });
   });
 
   app.patch("/api/business/employees/:id", async (req, res) => {
