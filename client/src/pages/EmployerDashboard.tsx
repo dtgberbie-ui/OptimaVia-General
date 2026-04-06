@@ -128,12 +128,12 @@ export default function EmployerDashboard() {
         <h1 className="text-lg font-semibold text-slate-900" data-testid="heading-dashboard">
           {greeting()}{displayName ? `, ${displayName.split(" ")[0]}` : ""}
         </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
+        <div className="text-sm text-slate-500 mt-0.5">
           {profileLoading
-            ? <Skeleton className="h-4 w-40 inline-block" />
+            ? <Skeleton className="h-4 w-40" />
             : <>{profile?.companyName} — {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</>
           }
-        </p>
+        </div>
       </div>
 
       {/* Unassigned alert */}

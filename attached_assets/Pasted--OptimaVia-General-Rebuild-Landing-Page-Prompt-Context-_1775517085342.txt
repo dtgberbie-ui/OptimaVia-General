@@ -1,0 +1,148 @@
+# OptimaVia General — Rebuild Landing Page Prompt
+
+## Context
+
+I have an existing landing page at optimavia.io that was built for a job board / two-sided marketplace. I have pivoted the product. OptimaVia General is now a **small business operations platform** — it helps businesses manage their teams, dispatch jobs, track finances, and run day-to-day operations from one app. It is NOT a job board or hiring platform anymore.
+
+I need you to **replace the current landing page** with a new one that reflects the new product. Keep the same tech stack and project structure. Only change the landing/homepage content and design.
+
+---
+
+## What the product actually does now
+
+OptimaVia General gives small businesses a single app to:
+- **Assign and track jobs** — managers create jobs, assign them to workers, track status in real time
+- **Dispatch field teams** — workers see assigned jobs on their phone, tap an address to navigate via Google Maps
+- **Track revenue and expenses** — log income and costs, see profit at a glance
+- **Photo accountability** — employees take check-in/check-out photos for proof of service and asset tracking
+- **Calculate product costs** — businesses that make products can build recipes, calculate cost per unit, and set smart pricing
+- **Manage their team** — add employees, assign roles, see who's working on what
+
+The app serves different business types by toggling modules on/off. A field service company sees job dispatch features. A product-based business sees costing and pricing features. Both get the core financial tracking and team management.
+
+---
+
+## New Landing Page Structure
+
+### Navigation bar
+- Left: OptimaVia logo + "General" label (keep the existing logo/brand style but drop "Gen" — spell out "General" in the accent color)
+- Right: "Sign In" button (outlined style, dark border, navigates to /login) and "Get Started" button (filled, primary brand color `#1e3a5f` or keep whatever dark navy the current site uses, white text, navigates to /register)
+
+### Hero section
+- **Headline:** "Manage your team. Track your money. Run your ops."
+- **Subheadline:** "One app for job scheduling, financial tracking, and daily operations — built for small businesses that move fast."
+- **Single CTA button:** "Get Started — Free" (filled, primary color, large, navigates to /register)
+- **Secondary link below button:** "Already have an account? Sign in" (text link, navigates to /login)
+- Clean background — keep it simple, light/white with subtle gradient like the current site has
+
+### "How it works" section
+- Section heading: "One platform, built around your business"
+- 3 steps displayed as cards or columns:
+
+**Step 1: Set up your business**
+- Icon: building/storefront icon
+- Text: "Tell us what kind of business you run. We'll configure the right tools for you — field service, product-based, or both."
+
+**Step 2: Add your team and start working**
+- Icon: people/team icon
+- Text: "Invite your employees, create your first jobs or products, and start tracking from day one."
+
+**Step 3: See everything in one place**
+- Icon: dashboard/chart icon
+- Text: "Revenue, expenses, job status, team activity — your entire operation on one screen."
+
+### Features section
+- Section heading: "Everything you need to run your operation"
+- 6 feature cards in a 3x2 grid (or 2x3 on mobile). Each card has an icon, a title, and a one-line description:
+
+**Card 1: Job scheduling**
+- Icon: calendar/clipboard icon
+- "Create jobs, assign workers, and track progress from assigned to completed."
+
+**Card 2: Team dispatch**
+- Icon: map pin / navigation icon
+- "Workers see their assignments and tap to navigate — straight to Google Maps."
+
+**Card 3: Revenue & expense tracking**
+- Icon: dollar sign / chart icon
+- "Log every dollar in and out. See your profit in real time, not at tax season."
+
+**Card 4: Photo accountability**
+- Icon: camera icon
+- "Check-in and check-out photos for every job. Proof of service, no arguments."
+
+**Card 5: Product costing**
+- Icon: calculator / recipe icon
+- "Build recipes, track ingredient costs, and know exactly what it costs to make each product."
+
+**Card 6: Smart pricing**
+- Icon: tag / price icon
+- "Set your margin, get your selling price. See which products make money and which don't."
+
+### "Who it's for" section
+- Section heading: "Built for businesses like yours"
+- 3 example cards side by side showing different business types:
+
+**Card 1: Field service companies**
+- "Cleaning crews, maintenance teams, mobile technicians — anyone dispatching workers to job sites."
+
+**Card 2: Food & product businesses**
+- "Ice cream shops, bakeries, food trucks — anyone who needs to know what it costs to make what they sell."
+
+**Card 3: Growing small businesses**
+- "If you're tracking jobs on paper and finances in your head, OptimaVia replaces all of it."
+
+### Social proof / trust section (keep it simple for now)
+- Section heading: "Trusted by small businesses in Raleigh, NC"
+- Subtext: "We're starting local and growing with our customers."
+- This section can be minimal for now — just the text. Later we'll add logos and testimonials.
+
+### Final CTA section
+- Dark background section (navy/dark blue matching the brand)
+- Headline: "Ready to run your business smarter?"
+- Subheadline: "Set up takes 5 minutes. No credit card required."
+- CTA button: "Get Started — Free" (white button on dark background, navigates to /register)
+
+### Footer
+- Left: OptimaVia General logo
+- Center links: Features, Pricing (can link to # for now), Contact
+- Right: "© 2026 OptimaVia. All rights reserved."
+- Keep it simple and clean
+
+---
+
+## Design Requirements
+
+- **Keep the same brand color scheme** as the current site (dark navy primary, clean whites and light grays)
+- **Mobile-first responsive** — must look great on phones since that's how most users will access it
+- **Remove ALL references to:**
+  - "I'm an Employer" / "I'm a Worker" buttons
+  - Job board language (candidates, hiring, matching, outreach, talent)
+  - Fit & Reliability Score
+  - Smart Matching
+  - Instant Outreach
+  - Any two-sided marketplace language
+- **No mention of AI or algorithms** — keep it simple and practical. These are small business owners, not tech people.
+- **Icons** should be simple outline-style (Lucide or Heroicons style). Use the same icon style as the current site.
+- **Animations:** Subtle fade-in on scroll for sections. Nothing flashy.
+- **The page should feel professional but approachable** — not corporate, not startup-y. Think "reliable tool for real businesses."
+
+---
+
+## Routes
+
+- `/` → This new landing page (public, no auth required)
+- `/login` → Existing login page (keep as-is)
+- `/register` → Registration page (can be a simple form for now or link to /login if registration isn't built yet)
+- `/dashboard` → Dashboard (requires auth, keep as-is)
+
+The "Sign In" links on the landing page should go to `/login`. The "Get Started" buttons should go to `/register`.
+
+---
+
+## Important
+
+- Do NOT delete or modify the login page, dashboard, or any other existing app pages. Only replace the landing/home page content.
+- Keep all existing routes and functionality intact.
+- The landing page is a marketing page — it does not require authentication. Anyone can view it.
+- If someone is already logged in and visits `/`, you can optionally redirect them to `/dashboard`, but this is not required for now.
