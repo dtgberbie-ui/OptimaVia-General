@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Pencil, Trash2, FlaskConical, Loader2 } from "lucide-react";
+import { useUser } from "@/hooks/use-auth";
+import { Plus, Pencil, Trash2, FlaskConical, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Ingredient = { id: number; name: string; unit: string; costPerUnit: number; supplier: string | null };
+type Profile = { enabledModules: string[] | null };
 
 const UNITS = ["oz", "lb", "gallon", "liter", "fl oz", "cup", "each", "gram", "kg", "ml"];
 
@@ -19,6 +21,23 @@ function empty() { return { name: "", unit: "oz", costPerUnit: "", supplier: "" 
 
 export default function Ingredients() {
   const { toast } = useToast();
+  const { data: user } = useUser();
+
+  const { data: profile } = useQuery<Profile>({
+    queryKey: ["/api/employer/profile", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employer/profile/${user?.id}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
+  const modules: string[] = profile?.enabledModules ?? [];
+  const isInventoryMode = modules.includes("field_service") && !modules.includes("product_costing");
+  const noun = isInventoryMode ? "Item" : "Ingredient";
+  const pageTitle = isInventoryMode ? "Inventory" : "Ingredients";
+  const PageIcon = isInventoryMode ? Package : FlaskConical;
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [form, setForm] = useState(empty());
@@ -36,7 +55,7 @@ export default function Ingredients() {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       close();
-      toast({ title: editing ? "Ingredient updated" : "Ingredient added" });
+      toast({ title: editing ? `${noun} updated` : `${noun} added` });
     },
     onError: () => toast({ title: "Failed to save", variant: "destructive" }),
   });
@@ -47,7 +66,7 @@ export default function Ingredients() {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setDeleteId(null);
-      toast({ title: "Ingredient deleted" });
+      toast({ title: `${noun} deleted` });
     },
     onError: () => toast({ title: "Failed to delete", variant: "destructive" }),
   });
@@ -82,7 +101,7 @@ export default function Ingredients() {
   return (
     <div className="px-4 py-5 max-w-lg mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900" data-testid="heading-ingredients">Ingredients</h1>
+        <h1 className="text-xl font-bold text-slate-900" data-testid="heading-ingredients">{pageTitle}</h1>
         <Button size="sm" onClick={openCreate} data-testid="button-add-ingredient">
           <Plus className="h-4 w-4 mr-1" /> Add
         </Button>
@@ -93,9 +112,11 @@ export default function Ingredients() {
       ) : ingredients?.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
-            <FlaskConical className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-slate-500 text-sm">No ingredients yet.</p>
-            <p className="text-slate-400 text-xs mt-1">Add ingredients to start building recipes.</p>
+            <PageIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+            <p className="text-slate-500 text-sm">No {pageTitle.toLowerCase()} yet.</p>
+            <p className="text-slate-400 text-xs mt-1">
+              {isInventoryMode ? "Add items to track your inventory costs." : "Add ingredients to start building recipes."}
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -130,12 +151,12 @@ export default function Ingredients() {
       <Dialog open={showDialog} onOpenChange={v => !v && close()}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Ingredient" : "Add Ingredient"}</DialogTitle>
+            <DialogTitle>{editing ? `Edit ${noun}` : `Add ${noun}`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Ingredient Name *</Label>
-              <Input placeholder="e.g. Heavy Cream" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="input-ingredient-name" />
+              <Label>{noun} Name *</Label>
+              <Input placeholder={isInventoryMode ? "e.g. Filter Oil, Gloves" : "e.g. Heavy Cream"} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} data-testid="input-ingredient-name" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -161,7 +182,7 @@ export default function Ingredients() {
             <Button variant="outline" onClick={close}>Cancel</Button>
             <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-ingredient">
               {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              {editing ? "Update" : "Add"} Ingredient
+              {editing ? "Update" : "Add"} {noun}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -170,8 +191,10 @@ export default function Ingredients() {
       {/* Delete confirm */}
       <Dialog open={deleteId !== null} onOpenChange={v => !v && setDeleteId(null)}>
         <DialogContent className="max-w-sm mx-auto">
-          <DialogHeader><DialogTitle>Delete Ingredient?</DialogTitle></DialogHeader>
-          <p className="text-sm text-slate-600">This will also remove it from any recipes.</p>
+          <DialogHeader><DialogTitle>Delete {noun}?</DialogTitle></DialogHeader>
+          <p className="text-sm text-slate-600">
+            {isInventoryMode ? "This will remove the item from your inventory." : "This will also remove it from any recipes."}
+          </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
             <Button variant="destructive" onClick={() => deleteMutation.mutate(deleteId!)} disabled={deleteMutation.isPending}>

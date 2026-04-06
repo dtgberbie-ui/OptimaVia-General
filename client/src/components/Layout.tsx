@@ -37,11 +37,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const modules: string[] = profile?.enabledModules ?? [];
   const hasModule = (m: string) => modules.includes(m) || modules.length === 0;
 
+  // Label adapts: field service businesses → "Inventory", product costing → "Ingredients"
+  const ingredientsLabel = modules.includes("field_service") && !modules.includes("product_costing")
+    ? "Inventory"
+    : "Ingredients";
+
   // Build nav items based on enabled modules
   const navItems = [
     { label: "Dashboard", href: "/employer/dashboard", icon: LayoutDashboard, show: true, match: (l: string) => l === "/employer/dashboard" },
     { label: "Jobs", href: "/employer/service-jobs", icon: ClipboardList, show: hasModule("field_service"), match: (l: string) => l.startsWith("/employer/service-jobs") },
-    { label: "Ingredients", href: "/employer/ingredients", icon: FlaskConical, show: hasModule("product_costing"), match: (l: string) => l === "/employer/ingredients" },
+    { label: ingredientsLabel, href: "/employer/ingredients", icon: FlaskConical, show: hasModule("product_costing"), match: (l: string) => l === "/employer/ingredients" },
     { label: "Products", href: "/employer/products", icon: Package, show: hasModule("product_costing"), match: (l: string) => l === "/employer/products" },
     { label: "Finances", href: "/employer/finances", icon: DollarSign, show: hasModule("finances"), match: (l: string) => l === "/employer/finances" },
     { label: "Team", href: "/employer/team", icon: Users, show: hasModule("team"), match: (l: string) => l === "/employer/team" },
