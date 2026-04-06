@@ -784,6 +784,18 @@ Apply now at ${profile?.companyName || 'our company'}!`;
     res.json(updated);
   });
 
+  app.patch("/api/business/employees/:id/password", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const id = parseInt(req.params.id);
+    const { password } = req.body;
+    if (!password || password.length < 4) {
+      return res.status(400).json({ message: "Password must be at least 4 characters" });
+    }
+    const hashedPw = await hashPassword(password);
+    const updated = await storage.updateUser(id, { password: hashedPw });
+    res.json({ success: true, username: updated.username });
+  });
+
   // === SERVICE JOBS (FIELD SERVICE MODULE) ===
 
   app.get("/api/service-jobs", async (req, res) => {
