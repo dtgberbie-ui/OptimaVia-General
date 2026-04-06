@@ -213,9 +213,11 @@ function EmployeeCard({ emp, onToggle, toggling }: {
           </div>
           <div className="min-w-0 flex-1">
             <p className={`font-semibold text-sm ${isActive ? "text-slate-900" : "text-slate-400"}`}>{emp.name || emp.username}</p>
-            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
-              {emp.email && <span className="flex items-center gap-0.5"><Mail className="h-3 w-3" />{emp.email}</span>}
-              {emp.phone && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{emp.phone}</span>}
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-xs text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded" data-testid={`text-login-${emp.id}`}>
+                {emp.username}
+              </span>
+              {emp.phone && <span className="flex items-center gap-0.5 text-xs text-slate-500"><Phone className="h-3 w-3" />{emp.phone}</span>}
             </div>
           </div>
           <Switch
