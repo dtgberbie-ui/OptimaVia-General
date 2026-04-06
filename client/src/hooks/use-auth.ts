@@ -55,13 +55,21 @@ export function useLogin() {
   });
 }
 
+export type RegisterData = {
+  businessName: string;
+  name: string;
+  email: string;
+  password: string;
+  businessType: string;
+};
+
 export function useRegister() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   return useMutation({
-    mutationFn: async (userData: InsertUser) => {
+    mutationFn: async (userData: RegisterData) => {
       const res = await fetch(api.auth.register.path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,11 +85,8 @@ export function useRegister() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData([api.auth.user.path], user);
-      toast({ title: "Account created!", description: "Let's set up your profile." });
-      
-      // Redirect to onboarding
-      if (user.role === "employer") setLocation("/onboarding/employer");
-      else setLocation("/onboarding/worker");
+      toast({ title: "Account created!", description: "Welcome to OptimaVia." });
+      setLocation("/employer/dashboard");
     },
     onError: (error: Error) => {
       toast({ 

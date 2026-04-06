@@ -44,7 +44,10 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username);
+        // Accept email OR username — email addresses contain @
+        const user = username.includes("@")
+          ? await storage.getUserByEmail(username)
+          : await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
           return done(null, false);
         } else {
@@ -68,15 +71,51 @@ export function setupAuth(app: Express) {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser) {
-        return res.status(400).send("Username already exists");
+      const { businessName, name, email, password, businessType } = req.body;
+
+      if (!email || !password || !businessName || !name) {
+        return res.status(400).json({ message: "Business name, your name, email, and password are required." });
       }
 
-      const hashedPassword = await hashPassword(req.body.password);
+      // Check for duplicate email
+      const existingByEmail = await storage.getUserByEmail(email);
+      if (existingByEmail) {
+        return res.status(400).json({ message: "An account with that email already exists." });
+      }
+
+      // Derive enabled modules from business type
+      const moduleMap: Record<string, string[]> = {
+        field_service: ["field_service", "finances", "team"],
+        product_costing: ["product_costing", "finances", "team"],
+        both: ["field_service", "product_costing", "finances", "team"],
+      };
+      const enabledModules = moduleMap[businessType] ?? ["finances", "team"];
+
+      const hashedPassword = await hashPassword(password);
       const user = await storage.createUser({
-        ...req.body,
+        username: email,
+        name,
+        email,
         password: hashedPassword,
+        role: "employer",
+      });
+
+      // Auto-create employer profile so onboarding is skipped
+      const crypto = await import("crypto");
+      const feedToken = crypto.randomBytes(16).toString("hex");
+      const industryMap: Record<string, string> = {
+        field_service: "Field Service",
+        product_costing: "Product / Retail",
+        both: "Field Service & Products",
+      };
+      await storage.createEmployerProfile({
+        userId: user.id,
+        companyName: businessName,
+        industry: industryMap[businessType] ?? "General",
+        location: "",
+        country: "United States",
+        enabledModules,
+        feedToken,
       });
 
       req.login(user, (err) => {

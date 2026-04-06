@@ -1,0 +1,45 @@
+# Fix Login / Register Page
+
+## Problem
+The current login/register page has "I am a... Worker / Employer" radio buttons. This is from the old job board model. OptimaVia is no longer a job board — it's a business operations platform. Remove the Worker/Employer choice entirely.
+
+## New Registration Flow
+
+Replace the current Register form with these fields in this order:
+
+1. **Business Name** — text input, placeholder "Your business name", required
+2. **Your Name** — text input, placeholder "Your full name", required
+3. **Email** — email input, placeholder "you@business.com", required
+4. **Password** — password input, placeholder "Choose a strong password", required, show/hide toggle
+5. **What does your business do?** — selection with 3 options (use styled radio buttons or selectable cards):
+   - "We send workers to job sites" — description below: "Field service, cleaning, maintenance, mobile teams"
+   - "We make and sell products" — description below: "Food, retail, manufacturing, handmade goods"
+   - "Both"
+6. **"Create Account" button** — same style as current, full width
+
+When the account is created:
+- Create a new `business` record with the business name
+- Set `active_modules` based on the selection:
+  - "We send workers to job sites" → `['field_service']`
+  - "We make and sell products" → `['product_costing']`
+  - "Both" → `['field_service', 'product_costing']`
+- Create the user with role `owner` linked to that business
+- Redirect to `/dashboard`
+
+## New Login Flow
+
+Replace the current Login form with just:
+
+1. **Email** — email input, placeholder "you@business.com"
+2. **Password** — password input with show/hide toggle
+3. **"Sign In" button** — full width, primary color
+4. **"Forgot password?"** link below, right-aligned (can be non-functional for now, just show the link)
+
+## Important
+
+- **Remove** the "I am a... Worker / Employer" radio buttons completely. Delete them.
+- **Remove** the "Username" field. Use email for authentication instead.
+- **Keep** the Login/Register tab toggle at the top — that's fine.
+- **Keep** the "Welcome to OptimaVia" heading and "Run your operations from one place" subheading.
+- Employees do NOT register themselves. They are added by the business owner from the Team management section inside the app. Only business owners/managers use the Register form.
+- Keep the same visual style and brand colors as the current page.
