@@ -1,0 +1,77 @@
+# Employee Database — Part 3: Employee Profile Page
+
+## What to do
+
+Build the employee profile detail page. This is what managers see when they tap an employee from the Team list built in Part 2.
+
+## Profile page layout
+
+### Header
+- Back arrow in top left (returns to the employee list)
+- "Edit" button in top right (outlined style)
+- Centered: large profile photo or initials circle (80px)
+- Employee full name below (18px, font-weight 600)
+- Job title below name (14px, muted)
+- Status badge below title (same badge styles from the list view)
+
+### Content sections (stack vertically, each in its own card with white background, 1px border, border-radius 8px, padding 16px)
+
+**Card 1: Contact info**
+- Card heading: "Contact" (14px, font-weight 500)
+- Phone number — show with a phone icon, tappable (opens phone dialer via `tel:` link)
+- Email — show with an email icon, tappable (opens email via `mailto:` link)
+- Address (if provided) — show with a map pin icon, tappable (opens Google Maps). If no address, show "No address on file" in muted text
+
+**Card 2: Employment details**
+- Card heading: "Employment" (14px, font-weight 500)
+- Rows displayed as label-value pairs (label on left in muted text, value on right):
+  - Employment type: "Full-time" / "Part-time" / "Contract"
+  - Start date: formatted like "Mar 15, 2025"
+  - End date: formatted date or "Present" if no end date
+  - Pay rate: formatted as "$20.00/hr" or "$45,000/yr" depending on pay type
+  - Department: value or "—" if empty
+
+**Card 3: Emergency contact**
+- Card heading: "Emergency contact" (14px, font-weight 500)
+- If filled in: name, phone (tappable), relationship
+- If not filled in: "No emergency contact on file" in muted text with an "Add" link
+
+**Card 4: Notes**
+- Card heading: "Notes" with "Add Note" button on the right (small, outlined)
+- Tapping "Add Note" expands an inline text area at the top of the notes list with a "Save" and "Cancel" button
+- Below: list of all notes, newest first
+- Each note shows:
+  - The note text (14px)
+  - "Added by {author name} on {formatted date}" below in muted 12px text
+  - Thin separator line between notes
+- If no notes: "No notes yet." in muted text
+
+**Card 5: History**
+- Card heading: "History" (14px, font-weight 500)
+- Auto-generated timeline from status changes and dates:
+  - "Started on {start_date}"
+  - Any status changes with dates
+  - "Terminated on {end_date}" if applicable
+- Display as a simple vertical timeline with small dots and connecting lines
+- Most recent event at top
+
+### Edit mode
+- Tapping "Edit" in the header makes all fields editable inline (inputs replace the display text)
+- Show "Save" and "Cancel" buttons fixed at the bottom of the page
+- Profile photo: show a "Change Photo" overlay on the photo circle, tapping opens file picker
+- For status changes to "Terminated": show a confirmation popup — "Mark this employee as terminated?" with an end date picker, and "Confirm" / "Cancel" buttons. When confirmed, disable the employee's login access.
+
+### Rehire button
+- If viewing a Terminated employee, show a "Rehire" button at the bottom of the page
+- Tapping it: sets status back to "Active", clears the end date, logs a new start date, re-enables login access, adds a history entry
+
+## Access control
+- **Owner/Manager**: sees everything, can edit everything, can add notes
+- **Employee viewing their own profile**: sees contact info, job title, employment type, start date. Does NOT see: pay rate, manager notes, emergency contact. Cannot edit anything.
+
+## Important
+- This page uses the API endpoints built in Part 1
+- Mobile-first layout — cards stack vertically, full width
+- All phone numbers use `tel:` links
+- All addresses open Google Maps via `https://www.google.com/maps/dir/?api=1&destination={encoded_address}`
+- Do NOT break any existing pages
