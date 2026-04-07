@@ -45,19 +45,14 @@ export function setupAuth(app: Express) {
     new LocalStrategy(async (username, password, done) => {
       try {
         // Accept email OR username — email addresses contain @
-        const isEmail = username.includes("@");
-        console.log(`[auth] login attempt: "${username}" isEmail=${isEmail}`);
-        const user = isEmail
+        const user = username.includes("@")
           ? await storage.getUserByEmail(username)
           : await storage.getUserByUsername(username);
-        console.log(`[auth] user found: ${user ? `id=${user.id} role=${user.role}` : "none"}`);
-        if (!user) return done(null, false);
-        const passwordOk = await comparePasswords(password, user.password);
-        console.log(`[auth] password match: ${passwordOk}`);
-        if (!passwordOk) return done(null, false);
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        }
         return done(null, user);
       } catch (err) {
-        console.error(`[auth] error:`, err);
         return done(err);
       }
     }),
