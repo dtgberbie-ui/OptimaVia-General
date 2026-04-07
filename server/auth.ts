@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
+import { sendEmployerWelcomeEmail } from "./email";
 
 const scryptAsync = promisify(scrypt);
 
@@ -116,6 +117,13 @@ export function setupAuth(app: Express) {
         enabledModules,
         feedToken,
       });
+
+      // Send welcome email to new employer (fire-and-forget)
+      sendEmployerWelcomeEmail({
+        to: email,
+        name,
+        businessName,
+      }).catch(() => {});
 
       req.login(user, (err) => {
         if (err) return next(err);

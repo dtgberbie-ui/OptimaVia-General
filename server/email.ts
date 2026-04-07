@@ -140,6 +140,43 @@ export async function sendPasswordResetEmail(opts: {
   return send({ to: opts.to, subject: `Your ${opts.businessName} password has been reset`, html });
 }
 
+export async function sendEmployerWelcomeEmail(opts: {
+  to: string;
+  name: string;
+  businessName: string;
+}): Promise<SendResult> {
+  const html = baseTemplate(`
+    <p style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0f172a">
+      Welcome to OptimaVia!
+    </p>
+    <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6">
+      Hi ${escHtml(opts.name)}, your OptimaVia account for <strong>${escHtml(opts.businessName)}</strong> is all set up and ready to go.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0"
+      style="background:#f1f5f9;border-radius:8px;padding:20px;margin-bottom:20px">
+      <tr>
+        <td style="padding:8px 0">
+          <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">What you can do</p>
+          <ul style="margin:8px 0 0;padding-left:20px;color:#475569;font-size:14px;line-height:1.8">
+            <li>Dispatch jobs to your team</li>
+            <li>Track job status and photos in real time</li>
+            <li>Manage employees and their access</li>
+            <li>Log revenue and expenses</li>
+          </ul>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:13px;color:#64748b;line-height:1.6">
+      Sign in anytime at your OptimaVia link to manage your operations.
+    </p>
+    <p style="margin:0;font-size:13px;color:#94a3b8">
+      — The OptimaVia Team
+    </p>
+  `);
+
+  return send({ to: opts.to, subject: `Welcome to OptimaVia — ${opts.businessName} is ready!`, html });
+}
+
 export async function sendJobAssignmentEmail(opts: {
   to: string;
   employeeName: string;
