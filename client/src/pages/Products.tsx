@@ -15,7 +15,7 @@ type Ingredient = { id: number; name: string; unit: string; costPerUnit: number 
 type ProductIngredient = { id: number; ingredientId: number; quantityPerUnit: number; ingredient: Ingredient };
 type Product = {
   id: number; name: string; description: string | null; category: string | null;
-  sellingPrice: number | null; costPerUnit: number;
+  sellingPrice: number | null; costPerUnit: number; batchYield: number | null;
   productIngredients: ProductIngredient[];
 };
 
@@ -36,7 +36,7 @@ export default function Products() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", category: "", sellingPrice: "" });
+  const [form, setForm] = useState({ name: "", description: "", category: "", sellingPrice: "", batchYield: "1" });
   const [recipeItems, setRecipeItems] = useState<{ ingredientId: number; quantity: string }[]>([]);
   const [margin, setMargin] = useState("");
 
@@ -72,7 +72,7 @@ export default function Products() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ name: "", description: "", category: "", sellingPrice: "" });
+    setForm({ name: "", description: "", category: "", sellingPrice: "", batchYield: "1" });
     setRecipeItems([]);
     setMargin("");
     setShowDialog(true);
@@ -80,7 +80,13 @@ export default function Products() {
 
   function openEdit(p: Product) {
     setEditing(p);
-    setForm({ name: p.name, description: p.description ?? "", category: p.category ?? "", sellingPrice: p.sellingPrice != null ? String(p.sellingPrice) : "" });
+    setForm({
+      name: p.name,
+      description: p.description ?? "",
+      category: p.category ?? "",
+      sellingPrice: p.sellingPrice != null ? String(p.sellingPrice) : "",
+      batchYield: p.batchYield != null ? String(p.batchYield) : "1",
+    });
     setRecipeItems(p.productIngredients.map(pi => ({ ingredientId: pi.ingredientId, quantity: String(pi.quantityPerUnit) })));
     setMargin("");
     setShowDialog(true);
@@ -98,12 +104,15 @@ export default function Products() {
     setRecipeItems(items => items.filter((_, idx) => idx !== i));
   }
 
-  // Calculated cost from current recipe items
-  const calcCost = recipeItems.reduce((sum, item) => {
+  // Total ingredient cost for the whole batch
+  const batchYieldNum = Math.max(1, parseInt(form.batchYield) || 1);
+  const totalBatchCost = recipeItems.reduce((sum, item) => {
     const ing = ingredients?.find(i => i.id === item.ingredientId);
     if (!ing) return sum;
     return sum + ing.costPerUnit * (parseFloat(item.quantity) || 0);
   }, 0);
+  // Cost per single unit = total batch cost / number of items produced
+  const calcCost = totalBatchCost / batchYieldNum;
 
   const sellingPriceNum = parseFloat(form.sellingPrice) || 0;
   const marginNum = sellingPriceNum > 0 ? pct(calcCost, sellingPriceNum) : 0;
@@ -126,6 +135,7 @@ export default function Products() {
       description: form.description || null,
       category: form.category || null,
       sellingPrice: sellingPriceNum || null,
+      batchYield: batchYieldNum,
       ingredients: recipeItems.filter(i => i.quantity && parseFloat(i.quantity) > 0).map(i => ({
         ingredientId: i.ingredientId,
         quantityPerUnit: parseFloat(i.quantity),
@@ -195,6 +205,9 @@ export default function Products() {
           <CardContent className="p-4 pt-2 text-sm">
             {p.description && <p className="text-slate-500 mb-3">{p.description}</p>}
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Recipe</h3>
+            {(p.batchYield ?? 1) > 1 && (
+              <p className="text-xs text-slate-500 mb-2">Recipe makes <strong>{p.batchYield} units</strong></p>
+            )}
             {p.productIngredients.length === 0 ? (
               <p className="text-slate-400 text-xs">No ingredients added</p>
             ) : (
@@ -205,6 +218,12 @@ export default function Products() {
                     <span className="text-slate-500">${(pi.ingredient.costPerUnit * pi.quantityPerUnit).toFixed(4)}</span>
                   </div>
                 ))}
+                {(p.batchYield ?? 1) > 1 && (
+                  <div className="flex justify-between text-xs text-slate-500 border-t pt-1 mt-1">
+                    <span>Total batch cost ({p.batchYield} units)</span>
+                    <span>${(p.costPerUnit * (p.batchYield ?? 1)).toFixed(4)}</span>
+                  </div>
+                )}
                 <div className="border-t pt-1 mt-1 flex justify-between text-sm font-semibold">
                   <span>Cost per unit</span>
                   <span>${p.costPerUnit.toFixed(4)}</span>
@@ -232,9 +251,13 @@ export default function Products() {
                 <Input placeholder="e.g. Cones" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
               </div>
               <div>
-                <Label>Selling Price ($)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0.00" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} data-testid="input-selling-price" />
+                <Label>Units per Batch</Label>
+                <Input type="number" step="1" min="1" placeholder="1" value={form.batchYield} onChange={e => setForm(f => ({ ...f, batchYield: e.target.value }))} data-testid="input-batch-yield" />
               </div>
+            </div>
+            <div>
+              <Label>Selling Price per Unit ($)</Label>
+              <Input type="number" step="0.01" min="0" placeholder="0.00" value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: e.target.value }))} data-testid="input-selling-price" />
             </div>
             <div>
               <Label>Description</Label>
@@ -261,13 +284,19 @@ export default function Products() {
                 ))}
               </div>
               {recipeItems.length > 0 && (
-                <div className="mt-2 bg-slate-50 rounded-lg p-2 text-xs">
+                <div className="mt-2 bg-slate-50 rounded-lg p-2 text-xs space-y-1">
+                  {batchYieldNum > 1 && (
+                    <div className="flex justify-between text-slate-500">
+                      <span>Total batch cost ({batchYieldNum} units):</span>
+                      <span>${totalBatchCost.toFixed(4)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-semibold">
-                    <span>Calculated cost per unit:</span>
+                    <span>Cost per unit:</span>
                     <span>${calcCost.toFixed(4)}</span>
                   </div>
                   {sellingPriceNum > 0 && (
-                    <div className={`flex justify-between mt-1 font-semibold ${marginColor(marginNum)}`}>
+                    <div className={`flex justify-between font-semibold ${marginColor(marginNum)}`}>
                       <span>Margin:</span>
                       <span>{marginNum.toFixed(1)}%</span>
                     </div>

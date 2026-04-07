@@ -494,7 +494,9 @@ export class DatabaseStorage implements IStorage {
       const [ing] = await db.select().from(ingredients).where(eq(ingredients.id, pi.ingredientId));
       return { ...pi, ingredient: ing };
     }));
-    const costPerUnit = enriched.reduce((sum, pi) => sum + (pi.ingredient?.costPerUnit ?? 0) * pi.quantityPerUnit, 0);
+    const totalBatchCost = enriched.reduce((sum, pi) => sum + (pi.ingredient?.costPerUnit ?? 0) * pi.quantityPerUnit, 0);
+    const batchYield = p.batchYield ?? 1;
+    const costPerUnit = totalBatchCost / batchYield;
     return { ...p, productIngredients: enriched, costPerUnit };
   }
 

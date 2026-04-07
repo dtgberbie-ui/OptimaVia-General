@@ -236,6 +236,7 @@ export const products = pgTable("products", {
   description: text("description"),
   category: text("category"),
   sellingPrice: real("selling_price"), // dollars, nullable until set
+  batchYield: integer("batch_yield").default(1), // how many units the recipe makes
   createdAt: timestamp("created_at").defaultNow(),
 });
 
