@@ -39,6 +39,8 @@ export default function Products() {
   const [form, setForm] = useState({ name: "", description: "", category: "", sellingPrice: "", batchYield: "1" });
   const [recipeItems, setRecipeItems] = useState<{ ingredientId: number; quantity: string }[]>([]);
   const [margin, setMargin] = useState("");
+  const [profitAmount, setProfitAmount] = useState("");
+  const [calcTab, setCalcTab] = useState<"percent" | "amount">("percent");
 
   const { data: products, isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
@@ -75,6 +77,8 @@ export default function Products() {
     setForm({ name: "", description: "", category: "", sellingPrice: "", batchYield: "1" });
     setRecipeItems([]);
     setMargin("");
+    setProfitAmount("");
+    setCalcTab("percent");
     setShowDialog(true);
   }
 
@@ -89,6 +93,8 @@ export default function Products() {
     });
     setRecipeItems(p.productIngredients.map(pi => ({ ingredientId: pi.ingredientId, quantity: String(pi.quantityPerUnit) })));
     setMargin("");
+    setProfitAmount("");
+    setCalcTab("percent");
     setShowDialog(true);
   }
 
@@ -117,13 +123,36 @@ export default function Products() {
   const sellingPriceNum = parseFloat(form.sellingPrice) || 0;
   const marginNum = sellingPriceNum > 0 ? pct(calcCost, sellingPriceNum) : 0;
 
-  // If margin is entered, calculate price
+  // Apply % margin → selling price
   function applyMargin() {
     const m = parseFloat(margin);
     if (!m || m >= 100) return;
     const price = calcCost / (1 - m / 100);
     setForm(f => ({ ...f, sellingPrice: price.toFixed(2) }));
   }
+
+  // Apply fixed profit amount → selling price
+  function applyAmount() {
+    const amt = parseFloat(profitAmount);
+    if (isNaN(amt) || amt < 0) return;
+    const price = calcCost + amt;
+    setForm(f => ({ ...f, sellingPrice: price.toFixed(2) }));
+  }
+
+  // Preview prices while typing
+  const percentPreview = (() => {
+    const m = parseFloat(margin);
+    if (!m || m >= 100 || calcCost <= 0) return null;
+    return (calcCost / (1 - m / 100)).toFixed(2);
+  })();
+
+  const amountPreview = (() => {
+    const amt = parseFloat(profitAmount);
+    if (isNaN(amt) || amt < 0 || calcCost <= 0) return null;
+    const price = calcCost + amt;
+    const m = pct(calcCost, price);
+    return { price: price.toFixed(2), margin: m.toFixed(1) };
+  })();
 
   function handleSave() {
     if (!form.name) {
@@ -305,19 +334,57 @@ export default function Products() {
               )}
             </div>
 
-            {/* Margin calculator */}
+            {/* Pricing calculator */}
             {calcCost > 0 && (
               <div className="bg-blue-50 rounded-lg p-3">
-                <p className="text-xs font-semibold text-blue-700 mb-2">Target Margin Calculator</p>
-                <div className="flex gap-2">
-                  <Input type="number" step="1" min="0" max="99" placeholder="e.g. 65" value={margin} onChange={e => setMargin(e.target.value)} className="h-8 text-sm" data-testid="input-margin" />
-                  <span className="text-sm self-center text-slate-500">%</span>
-                  <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={applyMargin} data-testid="button-apply-margin">Apply</Button>
+                <p className="text-xs font-semibold text-blue-700 mb-2">Pricing Calculator</p>
+                {/* Tab switcher */}
+                <div className="flex rounded-md overflow-hidden border border-blue-200 mb-3 text-xs font-medium">
+                  <button
+                    type="button"
+                    className={`flex-1 py-1.5 transition-colors ${calcTab === "percent" ? "bg-blue-600 text-white" : "bg-white text-blue-700 hover:bg-blue-50"}`}
+                    onClick={() => setCalcTab("percent")}
+                    data-testid="tab-calc-percent"
+                  >% Margin</button>
+                  <button
+                    type="button"
+                    className={`flex-1 py-1.5 transition-colors ${calcTab === "amount" ? "bg-blue-600 text-white" : "bg-white text-blue-700 hover:bg-blue-50"}`}
+                    onClick={() => setCalcTab("amount")}
+                    data-testid="tab-calc-amount"
+                  >$ Profit</button>
                 </div>
-                {margin && parseFloat(margin) < 100 && (
-                  <p className="text-xs text-blue-600 mt-1.5">
-                    Recommended price: <strong>${(calcCost / (1 - parseFloat(margin) / 100)).toFixed(2)}</strong>
-                  </p>
+
+                {calcTab === "percent" && (
+                  <>
+                    <p className="text-xs text-slate-500 mb-1.5">Enter your target margin and we'll set the selling price.</p>
+                    <div className="flex gap-2">
+                      <Input type="number" step="1" min="0" max="99" placeholder="e.g. 65" value={margin} onChange={e => setMargin(e.target.value)} className="h-8 text-sm" data-testid="input-margin" />
+                      <span className="text-sm self-center text-slate-500">%</span>
+                      <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={applyMargin} data-testid="button-apply-margin">Apply</Button>
+                    </div>
+                    {percentPreview && (
+                      <p className="text-xs text-blue-600 mt-1.5">
+                        Recommended price: <strong>${percentPreview}</strong>
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {calcTab === "amount" && (
+                  <>
+                    <p className="text-xs text-slate-500 mb-1.5">Enter the profit you want per unit and we'll set the selling price.</p>
+                    <div className="flex gap-2">
+                      <span className="text-sm self-center text-slate-500">$</span>
+                      <Input type="number" step="0.01" min="0" placeholder="e.g. 1.50" value={profitAmount} onChange={e => setProfitAmount(e.target.value)} className="h-8 text-sm" data-testid="input-profit-amount" />
+                      <span className="text-xs self-center text-slate-400">profit/unit</span>
+                      <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={applyAmount} data-testid="button-apply-amount">Apply</Button>
+                    </div>
+                    {amountPreview && (
+                      <p className="text-xs text-blue-600 mt-1.5">
+                        Recommended price: <strong>${amountPreview.price}</strong> <span className="text-slate-500">({amountPreview.margin}% margin)</span>
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}
