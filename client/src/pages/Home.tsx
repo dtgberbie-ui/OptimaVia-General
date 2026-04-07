@@ -11,7 +11,7 @@ export default function Home() {
       {/* ── Hero ── */}
       <section className="relative overflow-hidden pt-20 pb-28 px-5 text-center bg-gradient-to-b from-slate-50 to-white">
         <div className="max-w-2xl mx-auto">
-          <span className="inline-block bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full mb-6 tracking-wide uppercase">Built for YOUR businesses</span>
+          <span className="inline-block bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full mb-6 tracking-wide uppercase">Built for YOUR business</span>
           <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-slate-900 mb-5">
             Manage your team.<br />
             Track your money.<br />
