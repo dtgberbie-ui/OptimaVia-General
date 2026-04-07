@@ -49,6 +49,13 @@ Preferred communication style: Simple, everyday language.
 - Add employee with username/password (creates login account)
 - Employee accounts belong to employer's business via `businessId`
 
+### Employee Database Module (`employee_database`)
+- Extended employee profiles: job title, employment type, pay rate/type, start date, department
+- Address and emergency contact fields
+- Manager notes per employee (with author attribution)
+- Status: active / inactive / terminated
+- API: GET/PUT `/api/employees`, GET/PUT `/api/employees/:id`, PATCH status, GET/POST notes
+
 ## System Architecture
 
 ### Frontend Architecture

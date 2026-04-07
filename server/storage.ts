@@ -5,6 +5,7 @@ import {
   jobDistributions, integrationCredentials, applicationClicks,
   industryConfigs, scheduleShifts,
   serviceJobs, jobPhotos, ingredients, products, productIngredients,
+  employeeProfiles, employeeNotes,
   type User, type InsertUser,
   type EmployerProfile, type InsertEmployerProfile,
   type WorkerProfile, type InsertWorkerProfile,
@@ -25,7 +26,9 @@ import {
   type Ingredient, type InsertIngredient,
   type Product, type InsertProduct,
   type ProductIngredient, type InsertProductIngredient,
-  type ServiceJobWithDetails, type ProductWithIngredients
+  type EmployeeProfile, type InsertEmployeeProfile,
+  type EmployeeNote, type InsertEmployeeNote,
+  type ServiceJobWithDetails, type ProductWithIngredients, type EmployeeWithProfile
 } from "@shared/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 
@@ -125,6 +128,14 @@ export interface IStorage {
   deleteProduct(id: number): Promise<void>;
 
   setProductIngredients(productId: number, items: Omit<InsertProductIngredient, "productId">[]): Promise<void>;
+
+  // Employee Database Module
+  getEmployeesWithProfiles(businessId: number): Promise<EmployeeWithProfile[]>;
+  getEmployeeWithProfile(userId: number): Promise<EmployeeWithProfile | undefined>;
+  upsertEmployeeProfile(profile: InsertEmployeeProfile): Promise<EmployeeProfile>;
+  updateEmployeeStatus(userId: number, status: string): Promise<User>;
+  addEmployeeNote(note: InsertEmployeeNote): Promise<EmployeeNote>;
+  getEmployeeNotes(userId: number): Promise<(EmployeeNote & { author: User | null })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -531,6 +542,58 @@ export class DatabaseStorage implements IStorage {
     if (items.length > 0) {
       await db.insert(productIngredients).values(items.map(i => ({ ...i, productId })));
     }
+  }
+
+  // === Employee Database Module ===
+
+  async getEmployeesWithProfiles(businessId: number): Promise<EmployeeWithProfile[]> {
+    const emps = await db.select().from(users).where(eq(users.businessId, businessId));
+    return Promise.all(emps.map(async emp => {
+      const [profile] = await db.select().from(employeeProfiles).where(eq(employeeProfiles.userId, emp.id));
+      return { ...emp, employeeProfile: profile ?? null };
+    }));
+  }
+
+  async getEmployeeWithProfile(userId: number): Promise<EmployeeWithProfile | undefined> {
+    const [emp] = await db.select().from(users).where(eq(users.id, userId));
+    if (!emp) return undefined;
+    const [profile] = await db.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId));
+    return { ...emp, employeeProfile: profile ?? null };
+  }
+
+  async upsertEmployeeProfile(profile: InsertEmployeeProfile): Promise<EmployeeProfile> {
+    const existing = await db.select().from(employeeProfiles).where(eq(employeeProfiles.userId, profile.userId));
+    if (existing.length > 0) {
+      const [updated] = await db.update(employeeProfiles)
+        .set({ ...profile, updatedAt: new Date() })
+        .where(eq(employeeProfiles.userId, profile.userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(employeeProfiles).values(profile).returning();
+    return created;
+  }
+
+  async updateEmployeeStatus(userId: number, status: string): Promise<User> {
+    const [updated] = await db.update(users).set({ status }).where(eq(users.id, userId)).returning();
+    return updated;
+  }
+
+  async addEmployeeNote(note: InsertEmployeeNote): Promise<EmployeeNote> {
+    const [created] = await db.insert(employeeNotes).values(note).returning();
+    return created;
+  }
+
+  async getEmployeeNotes(userId: number): Promise<(EmployeeNote & { author: User | null })[]> {
+    const notes = await db.select().from(employeeNotes)
+      .where(eq(employeeNotes.userId, userId))
+      .orderBy(desc(employeeNotes.createdAt));
+    return Promise.all(notes.map(async note => {
+      const author = note.authorId
+        ? (await db.select().from(users).where(eq(users.id, note.authorId)))[0] ?? null
+        : null;
+      return { ...note, author };
+    }));
   }
 }
 

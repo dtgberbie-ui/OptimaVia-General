@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useUser } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Settings, Loader2, ClipboardList, Package, DollarSign, Users } from "lucide-react";
+import { Settings, Loader2, ClipboardList, Package, DollarSign, Users, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -17,6 +17,7 @@ const MODULE_OPTIONS = [
   { key: "product_costing", label: "Product Costing", description: "Ingredient management, recipe builder, and pricing calculator.", icon: Package, color: "text-purple-600" },
   { key: "finances", label: "Finances", description: "Revenue and expense tracking with monthly summaries.", icon: DollarSign, color: "text-green-600" },
   { key: "team", label: "Team Management", description: "Employee profiles, login accounts, and status management.", icon: Users, color: "text-orange-600" },
+  { key: "employee_database", label: "Employee Database", description: "Full employee records: job titles, pay rates, start dates, emergency contacts, and manager notes.", icon: Database, color: "text-teal-600" },
 ];
 
 export default function BusinessSettings() {

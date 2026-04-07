@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, real } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, real, numeric } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -247,6 +247,39 @@ export const productIngredients = pgTable("product_ingredients", {
   quantityPerUnit: real("quantity_per_unit").notNull(), // how many units of ingredient per unit of product
 });
 
+// === EMPLOYEE DATABASE MODULE ===
+
+export const employeeProfiles = pgTable("employee_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  dateOfBirth: text("date_of_birth"), // YYYY-MM-DD
+  streetAddress: text("street_address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  jobTitle: text("job_title"),
+  employmentType: text("employment_type").default("full_time"), // full_time | part_time | contract
+  startDate: text("start_date"), // YYYY-MM-DD
+  endDate: text("end_date"), // YYYY-MM-DD
+  payRate: real("pay_rate"),
+  payType: text("pay_type").default("hourly"), // hourly | salary
+  department: text("department"),
+  profilePhotoUrl: text("profile_photo_url"),
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  emergencyContactRelationship: text("emergency_contact_relationship"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const employeeNotes = pgTable("employee_notes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(), // the employee
+  authorId: integer("author_id"), // who wrote the note
+  note: text("note").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -350,6 +383,15 @@ export const productIngredientsRelations = relations(productIngredients, ({ one 
   ingredient: one(ingredients, { fields: [productIngredients.ingredientId], references: [ingredients.id] }),
 }));
 
+export const employeeProfilesRelations = relations(employeeProfiles, ({ one }) => ({
+  user: one(users, { fields: [employeeProfiles.userId], references: [users.id] }),
+}));
+
+export const employeeNotesRelations = relations(employeeNotes, ({ one }) => ({
+  employee: one(users, { fields: [employeeNotes.userId], references: [users.id] }),
+  author: one(users, { fields: [employeeNotes.authorId], references: [users.id] }),
+}));
+
 // === BASE SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -372,6 +414,8 @@ export const insertJobPhotoSchema = createInsertSchema(jobPhotos).omit({ id: tru
 export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true });
 export const insertProductIngredientSchema = createInsertSchema(productIngredients).omit({ id: true });
+export const insertEmployeeProfileSchema = createInsertSchema(employeeProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEmployeeNoteSchema = createInsertSchema(employeeNotes).omit({ id: true, createdAt: true });
 
 // === TYPES ===
 
@@ -435,6 +479,12 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type ProductIngredient = typeof productIngredients.$inferSelect;
 export type InsertProductIngredient = z.infer<typeof insertProductIngredientSchema>;
 
+export type EmployeeProfile = typeof employeeProfiles.$inferSelect;
+export type InsertEmployeeProfile = z.infer<typeof insertEmployeeProfileSchema>;
+
+export type EmployeeNote = typeof employeeNotes.$inferSelect;
+export type InsertEmployeeNote = z.infer<typeof insertEmployeeNoteSchema>;
+
 // === COMPOSITE TYPES ===
 
 export type CreateJobRequest = Omit<InsertJob, "employerId">;
@@ -456,6 +506,10 @@ export type ServiceJobWithDetails = ServiceJob & {
 export type ProductWithIngredients = Product & {
   productIngredients: (ProductIngredient & { ingredient: Ingredient })[];
   costPerUnit: number;
+};
+
+export type EmployeeWithProfile = User & {
+  employeeProfile: EmployeeProfile | null;
 };
 
 export type AiSummaryRequest = { workerProfileId: number; jobId: number };

@@ -1012,6 +1012,79 @@ Apply now at ${profile?.companyName || 'our company'}!`;
     res.json({ success: true });
   });
 
+  // === EMPLOYEE DATABASE MODULE ===
+
+  // GET /api/employees — list all employees with profile data
+  app.get("/api/employees", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const businessId = req.user.role === "employer" ? req.user.id : req.user.businessId;
+    if (!businessId) return res.status(400).json({ message: "No business found" });
+    const employees = await storage.getEmployeesWithProfiles(businessId);
+    res.json(employees);
+  });
+
+  // GET /api/employees/:id — single employee with full profile
+  app.get("/api/employees/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const emp = await storage.getEmployeeWithProfile(parseInt(req.params.id));
+    if (!emp) return res.status(404).json({ message: "Employee not found" });
+    // Employees can only fetch their own profile
+    if (req.user.role === "employee" && emp.id !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    res.json(emp);
+  });
+
+  // PUT /api/employees/:id — update employee profile
+  app.put("/api/employees/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (req.user.role === "employee") return res.status(403).json({ message: "Forbidden" });
+    const userId = parseInt(req.params.id);
+    const { name, email, phone, ...profileFields } = req.body;
+    // Update user fields if provided
+    if (name !== undefined || email !== undefined || phone !== undefined) {
+      await storage.updateUser(userId, { name, email, phone });
+    }
+    // Upsert profile fields
+    const profile = await storage.upsertEmployeeProfile({ userId, ...profileFields });
+    const emp = await storage.getEmployeeWithProfile(userId);
+    res.json(emp);
+  });
+
+  // PATCH /api/employees/:id/status — change active/inactive/terminated
+  app.patch("/api/employees/:id/status", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (req.user.role === "employee") return res.status(403).json({ message: "Forbidden" });
+    const { status } = req.body;
+    if (!["active", "inactive", "terminated"].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    const updated = await storage.updateEmployeeStatus(parseInt(req.params.id), status);
+    res.json(updated);
+  });
+
+  // POST /api/employees/:id/notes — add a note
+  app.post("/api/employees/:id/notes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (req.user.role === "employee") return res.status(403).json({ message: "Forbidden" });
+    const { note } = req.body;
+    if (!note) return res.status(400).json({ message: "Note text is required" });
+    const created = await storage.addEmployeeNote({
+      userId: parseInt(req.params.id),
+      authorId: req.user.id,
+      note,
+    });
+    res.json(created);
+  });
+
+  // GET /api/employees/:id/notes — get notes for an employee
+  app.get("/api/employees/:id/notes", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (req.user.role === "employee") return res.status(403).json({ message: "Forbidden" });
+    const notes = await storage.getEmployeeNotes(parseInt(req.params.id));
+    res.json(notes);
+  });
+
   // === BUSINESS MODULE SETTINGS ===
 
   app.patch("/api/business/modules", async (req, res) => {
@@ -1081,6 +1154,24 @@ async function seedDatabase() {
     name: "Deon Williams",
     email: "deon@filtaraleigh.com",
     phone: "919-555-0103",
+    businessId: filta.id,
+  });
+  const emp4 = await storage.createUser({
+    username: "lisa_filta",
+    password: hashedPw,
+    role: "employee",
+    name: "Lisa Park",
+    email: "lisa@filtaraleigh.com",
+    phone: "919-555-0104",
+    businessId: filta.id,
+  });
+  const emp5 = await storage.createUser({
+    username: "sam_filta",
+    password: hashedPw,
+    role: "employee",
+    name: "Sam Williams",
+    email: "sam@filtaraleigh.com",
+    phone: "919-555-0105",
     businessId: filta.id,
   });
 
@@ -1207,11 +1298,45 @@ async function seedDatabase() {
     { ingredientId: waffleCone.id, quantityPerUnit: 1 },
   ]);
 
+  // Sweet Scoops employees
+  const ss1 = await storage.createUser({
+    username: "amy_scoops",
+    password: hashedPw,
+    role: "employee",
+    name: "Amy Chen",
+    email: "amy@sweetscoops.com",
+    phone: "984-555-0201",
+    businessId: iceCream.id,
+  });
+  const ss2 = await storage.createUser({
+    username: "jordan_scoops",
+    password: hashedPw,
+    role: "employee",
+    name: "Jordan Lee",
+    email: "jordan@sweetscoops.com",
+    phone: "984-555-0202",
+    businessId: iceCream.id,
+  });
+
   // Revenue and expenses for ice cream shop
   await storage.createTransaction({ employerId: iceCream.id, type: "revenue", category: "Walk-in Sales", amount: 34000, description: "Walk-in sales — Monday", date: new Date() });
   await storage.createTransaction({ employerId: iceCream.id, type: "revenue", category: "Walk-in Sales", amount: 28500, description: "Walk-in sales — Tuesday", date: new Date() });
   await storage.createTransaction({ employerId: iceCream.id, type: "expense", category: "Supplies", amount: 8500, description: "Cream & dairy restock", date: new Date() });
   await storage.createTransaction({ employerId: iceCream.id, type: "expense", category: "Utilities", amount: 3200, description: "Electric bill", date: new Date() });
+
+  // === Employee Profiles ===
+  const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; };
+
+  // Filta Raleigh employee profiles
+  await storage.upsertEmployeeProfile({ userId: emp1.id, jobTitle: "Service Technician", employmentType: "full_time", payRate: 20.00, payType: "hourly", startDate: daysAgo(180) });
+  await storage.upsertEmployeeProfile({ userId: emp2.id, jobTitle: "Service Technician", employmentType: "full_time", payRate: 19.00, payType: "hourly", startDate: daysAgo(240) });
+  await storage.upsertEmployeeProfile({ userId: emp3.id, jobTitle: "Senior Technician", employmentType: "full_time", payRate: 22.00, payType: "hourly", startDate: daysAgo(365) });
+  await storage.upsertEmployeeProfile({ userId: emp4.id, jobTitle: "Service Technician", employmentType: "full_time", payRate: 18.00, payType: "hourly", startDate: daysAgo(90) });
+  await storage.upsertEmployeeProfile({ userId: emp5.id, jobTitle: "Service Technician", employmentType: "part_time", payRate: 16.00, payType: "hourly", startDate: daysAgo(60) });
+
+  // Sweet Scoops employee profiles
+  await storage.upsertEmployeeProfile({ userId: ss1.id, jobTitle: "Shift Lead", employmentType: "part_time", payRate: 15.00, payType: "hourly", startDate: daysAgo(150) });
+  await storage.upsertEmployeeProfile({ userId: ss2.id, jobTitle: "Team Member", employmentType: "part_time", payRate: 13.00, payType: "hourly", startDate: daysAgo(60) });
 
   // === LEGACY EMPLOYER ACCOUNTS ===
   const emp_legacy = await storage.createUser({ username: "logistics_inc", password: hashedPw, role: "employer" });

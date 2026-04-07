@@ -1,0 +1,85 @@
+# Employee Database — Part 1: Database Setup & Module Toggle
+
+## What to do
+
+Add the database tables and module toggle for a new "Employee Database" feature. Do NOT build any UI yet — just the backend.
+
+## Database changes
+
+Add these new tables:
+
+```sql
+CREATE TABLE employee_profiles (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  date_of_birth DATE,
+  street_address VARCHAR(255),
+  city VARCHAR(100),
+  state VARCHAR(50),
+  zip_code VARCHAR(20),
+  job_title VARCHAR(100),
+  employment_type VARCHAR(20) DEFAULT 'full_time',
+  start_date DATE,
+  end_date DATE,
+  pay_rate DECIMAL(10,2),
+  pay_type VARCHAR(10) DEFAULT 'hourly',
+  department VARCHAR(100),
+  profile_photo_url TEXT,
+  emergency_contact_name VARCHAR(255),
+  emergency_contact_phone VARCHAR(50),
+  emergency_contact_relationship VARCHAR(50),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE employee_notes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  author_id INTEGER REFERENCES users(id),
+  note TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+Update the users table to support a third status option. Currently it has 'active' and 'inactive'. Add 'terminated' as a valid status.
+
+## Module toggle
+
+In the business settings where modules are toggled on/off, add a new option:
+- **"Employee Database"** → ON/OFF
+- When toggled ON, add `'employee_database'` to the business `active_modules` array
+- When toggled OFF, remove it
+
+## Seed data
+
+Add employee profiles for the existing demo employees:
+
+**Filta Raleigh employees:**
+- Jake Morrison: job_title "Service Technician", employment_type "full_time", pay_rate 20.00, pay_type "hourly", start_date 6 months ago
+- Tina Reyes: job_title "Service Technician", employment_type "full_time", pay_rate 19.00, pay_type "hourly", start_date 8 months ago
+- Dave Chen: job_title "Senior Technician", employment_type "full_time", pay_rate 22.00, pay_type "hourly", start_date 1 year ago
+- Lisa Park: job_title "Service Technician", employment_type "full_time", pay_rate 18.00, pay_type "hourly", start_date 3 months ago
+- Sam Williams: job_title "Service Technician", employment_type "part_time", pay_rate 16.00, pay_type "hourly", start_date 2 months ago
+
+**Sweet Scoops employees:**
+- Amy Chen: job_title "Shift Lead", employment_type "part_time", pay_rate 15.00, pay_type "hourly", start_date 5 months ago
+- Jordan Lee: job_title "Team Member", employment_type "part_time", pay_rate 13.00, pay_type "hourly", start_date 2 months ago
+
+## API endpoints to create
+
+```
+GET    /api/employees              — list all employees for the business (with profile data)
+GET    /api/employees/:id          — get single employee with full profile
+POST   /api/employees              — create new employee + profile
+PUT    /api/employees/:id          — update employee profile
+PATCH  /api/employees/:id/status   — change status (active/inactive/terminated)
+POST   /api/employees/:id/notes    — add a note to an employee
+GET    /api/employees/:id/notes    — get all notes for an employee
+```
+
+All endpoints require authentication. Only owner/manager roles can access them (except employees can GET their own profile).
+
+## Important
+- Do NOT build any UI in this step
+- Do NOT break existing functionality
+- Make sure existing login and team features still work
