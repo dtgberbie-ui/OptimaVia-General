@@ -140,6 +140,63 @@ export async function sendPasswordResetEmail(opts: {
   return send({ to: opts.to, subject: `Your ${opts.businessName} password has been reset`, html });
 }
 
+export async function sendJobAssignmentEmail(opts: {
+  to: string;
+  employeeName: string;
+  businessName: string;
+  clientName: string;
+  serviceAddress: string;
+  scheduledDate: string;
+  scheduledTime?: string | null;
+  notes?: string | null;
+}): Promise<SendResult> {
+  const when = opts.scheduledTime
+    ? `${opts.scheduledDate} at ${opts.scheduledTime}`
+    : opts.scheduledDate;
+
+  const html = baseTemplate(`
+    <p style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0f172a">
+      New Job Assigned
+    </p>
+    <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6">
+      Hi ${escHtml(opts.employeeName)}, you've been assigned a job by ${escHtml(opts.businessName)}.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0"
+      style="background:#f1f5f9;border-radius:8px;padding:20px;margin-bottom:20px">
+      <tr>
+        <td style="padding:8px 0">
+          <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Client</p>
+          <p style="margin:4px 0 0;font-size:15px;font-weight:600;color:#0f172a">${escHtml(opts.clientName)}</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-top:1px solid #e2e8f0">
+          <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Address</p>
+          <p style="margin:4px 0 0;font-size:14px;color:#0f172a">${escHtml(opts.serviceAddress)}</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;border-top:1px solid #e2e8f0">
+          <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Scheduled</p>
+          <p style="margin:4px 0 0;font-size:14px;color:#0f172a">${escHtml(when)}</p>
+        </td>
+      </tr>
+      ${opts.notes ? `
+      <tr>
+        <td style="padding:8px 0;border-top:1px solid #e2e8f0">
+          <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Notes</p>
+          <p style="margin:4px 0 0;font-size:14px;color:#475569">${escHtml(opts.notes)}</p>
+        </td>
+      </tr>` : ""}
+    </table>
+    <p style="margin:0;font-size:13px;color:#94a3b8">
+      Log in to OptimaVia to view and manage your job.
+    </p>
+  `);
+
+  return send({ to: opts.to, subject: `New job assigned: ${opts.clientName}`, html });
+}
+
 function escHtml(str: string) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

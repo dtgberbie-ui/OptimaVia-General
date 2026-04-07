@@ -10,7 +10,7 @@ import { users, jobs, workerProfiles, applications, employerProfiles, industryCo
 import { eq, and } from "drizzle-orm";
 import crypto, { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
-import { sendWelcomeEmail, sendPasswordResetEmail } from "./email";
+import { sendWelcomeEmail, sendPasswordResetEmail, sendJobAssignmentEmail } from "./email";
 
 const scryptAsync = promisify(scrypt);
 async function hashPassword(password: string) {
@@ -852,6 +852,27 @@ Apply now at ${profile?.companyName || 'our company'}!`;
       createdBy: req.user.id,
       status: body.assignedTo ? "assigned" : "unassigned",
     });
+
+    // Notify assigned employee if they have an email
+    if (body.assignedTo) {
+      const [employee, profile] = await Promise.all([
+        storage.getUser(body.assignedTo),
+        storage.getEmployerProfile(req.user.id),
+      ]);
+      if (employee?.email) {
+        sendJobAssignmentEmail({
+          to: employee.email,
+          employeeName: employee.name || employee.username,
+          businessName: profile?.companyName ?? "your employer",
+          clientName: job.clientName,
+          serviceAddress: job.serviceAddress,
+          scheduledDate: job.scheduledDate,
+          scheduledTime: job.scheduledTime,
+          notes: job.notes,
+        }).catch(() => {});
+      }
+    }
+
     res.status(201).json(job);
   });
 
@@ -861,7 +882,36 @@ Apply now at ${profile?.companyName || 'our company'}!`;
     const updates = { ...req.body };
     if (updates.status === "in_progress") updates.startedAt = new Date();
     if (updates.status === "completed") updates.completedAt = new Date();
+
+    // Detect reassignment: load existing job first
+    const existingJob = "assignedTo" in updates ? await storage.getServiceJob(id) : null;
+
     const job = await storage.updateServiceJob(id, updates);
+
+    // Send email if assignedTo changed to a new (non-null) employee
+    if (
+      existingJob &&
+      updates.assignedTo != null &&
+      updates.assignedTo !== existingJob.assignedTo
+    ) {
+      const [employee, profile] = await Promise.all([
+        storage.getUser(updates.assignedTo),
+        storage.getEmployerProfile(req.user.id),
+      ]);
+      if (employee?.email) {
+        sendJobAssignmentEmail({
+          to: employee.email,
+          employeeName: employee.name || employee.username,
+          businessName: profile?.companyName ?? "your employer",
+          clientName: job.clientName,
+          serviceAddress: job.serviceAddress,
+          scheduledDate: job.scheduledDate,
+          scheduledTime: job.scheduledTime,
+          notes: job.notes,
+        }).catch(() => {});
+      }
+    }
+
     res.json(job);
   });
 
