@@ -2,10 +2,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { useUser } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { MapPin, Clock, User, Camera, Key, ArrowLeft, CheckCircle, Play, Loader2, AlertCircle } from "lucide-react";
+import { MapPin, Clock, User, Camera, Key, ArrowLeft, CheckCircle, Play, Loader2, AlertCircle, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +41,8 @@ export default function ServiceJobDetail() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingType, setUploadingType] = useState<string | null>(null);
+  const [showReassign, setShowReassign] = useState(false);
+  const [reassignTo, setReassignTo] = useState<string>("none");
 
   const isEmployee = user?.role === "employee";
   const backPath = isEmployee ? "/employee/jobs" : "/employer/service-jobs";
@@ -50,6 +54,23 @@ export default function ServiceJobDetail() {
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
+  });
+
+  const { data: employees } = useQuery<Employee[]>({
+    queryKey: ["/api/business/employees"],
+    enabled: !isEmployee,
+  });
+
+  const reassignMutation = useMutation({
+    mutationFn: (assignedTo: number | null) =>
+      apiRequest("PATCH", `/api/service-jobs/${id}`, { assignedTo }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/service-jobs", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/service-jobs"] });
+      setShowReassign(false);
+      toast({ title: "Job reassigned successfully" });
+    },
+    onError: () => toast({ title: "Failed to reassign job", variant: "destructive" }),
   });
 
   const updateStatus = useMutation({
@@ -160,12 +181,21 @@ export default function ServiceJobDetail() {
               <Clock className="h-4 w-4 text-slate-400" />
               {job.scheduledDate}{job.scheduledTime ? ` at ${job.scheduledTime}` : ""}
             </div>
-            {job.assignedEmployee && (
-              <div className="flex items-center gap-1.5">
-                <User className="h-4 w-4 text-slate-400" />
-                {job.assignedEmployee.name || job.assignedEmployee.username}
-              </div>
-            )}
+            <div className="flex items-center gap-1.5">
+              <User className="h-4 w-4 text-slate-400" />
+              {job.assignedEmployee
+                ? (job.assignedEmployee.name || job.assignedEmployee.username)
+                : <span className="text-amber-600 font-medium">Unassigned</span>}
+              {!isEmployee && (
+                <button
+                  onClick={() => { setReassignTo(job.assignedEmployee ? String(job.assignedEmployee.id) : "none"); setShowReassign(true); }}
+                  className="ml-1 text-xs text-primary underline underline-offset-2 hover:text-primary/80"
+                  data-testid="button-reassign"
+                >
+                  Reassign
+                </button>
+              )}
+            </div>
           </div>
 
           {job.notes && (
@@ -265,6 +295,44 @@ export default function ServiceJobDetail() {
           handleFileChange(e, type);
         }}
       />
+
+      {/* Reassign Dialog */}
+      <Dialog open={showReassign} onOpenChange={setShowReassign}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5" /> Reassign Job
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-slate-500 mb-3">Select a new employee to assign this job to, or leave unassigned.</p>
+            <Select value={reassignTo} onValueChange={setReassignTo}>
+              <SelectTrigger data-testid="select-reassign-employee">
+                <SelectValue placeholder="Choose employee..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Unassigned</SelectItem>
+                {employees?.map(e => (
+                  <SelectItem key={e.id} value={String(e.id)}>
+                    {e.name || e.username}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReassign(false)}>Cancel</Button>
+            <Button
+              onClick={() => reassignMutation.mutate(reassignTo === "none" ? null : parseInt(reassignTo))}
+              disabled={reassignMutation.isPending}
+              data-testid="button-confirm-reassign"
+            >
+              {reassignMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
