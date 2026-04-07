@@ -1,0 +1,49 @@
+Employee Database — Part 4: Add Employee Form
+What to do
+Build the "Add Employee" form that opens when the manager taps the "Add Employee" button on the Team list page.
+Form page
+Header
+Back arrow in top left (returns to employee list)
+Page title: "Add employee"
+Form fields (in this order, all stacked vertically)
+First name — text input, required
+Last name — text input, required
+Email — email input, required (will be used for the employee's login)
+Phone — text input, required
+Job title — text input, required (placeholder: "e.g. Technician, Shift Lead, Server")
+Employment type — dropdown or segmented control: Full-time, Part-time, Contract
+Start date — date picker, required, default to today's date
+Pay rate — number input (placeholder: "0.00")
+Pay type — dropdown or segmented control: Hourly, Salary
+Department — text input, optional (placeholder: "Optional")
+Temporary password section
+Below the form fields, show a section: "Login credentials"
+Subtext: "A temporary password will be created for this employee. Share it with them so they can sign in."
+Either:
+Auto-generate a random 8-character password and display it after account creation, OR
+Let the manager type a password for the employee (simpler for now — add a password field with placeholder "Set a password for this employee")
+Go with the simpler option: let the manager set the password
+Submit button
+"Create Employee" — full width, primary brand color, white text
+On submit:
+Validate all required fields
+Create a new user record with role "employee", status "active", linked to the manager's business
+Create an employee_profiles record with the employment details
+Set email_verified to true (the manager is vouching for the employee, no need for email verification)
+Redirect back to the employee list with a success message: "Employee added successfully"
+Validation
+Email must be unique — if email already exists, show inline error: "An account with this email already exists"
+All required fields show inline error if empty on submit: "This field is required"
+Pay rate must be a positive number if provided
+What NOT to include on this form
+Keep the form fast — only 10 fields plus password. These fields are intentionally left out and can be added later by editing the employee's profile:
+Date of birth
+Address
+Emergency contact
+Profile photo
+Notes
+Important
+Mobile-first — large inputs, big tap targets, easy to fill on a phone
+The form should be a separate page/route, not a modal
+Only owners and managers can access this form — redirect employees if they try to visit it
+Do NOT break any existing pages

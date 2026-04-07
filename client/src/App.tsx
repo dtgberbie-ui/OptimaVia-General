@@ -19,6 +19,7 @@ import Ingredients from "@/pages/Ingredients";
 import Products from "@/pages/Products";
 import TeamManagement from "@/pages/TeamManagement";
 import EmployeeProfile from "@/pages/EmployeeProfile";
+import AddEmployee from "@/pages/AddEmployee";
 import BusinessSettings from "@/pages/BusinessSettings";
 import EmployeeJobs from "@/pages/EmployeeJobs";
 
@@ -83,7 +84,7 @@ function Router() {
           <ProtectedRoute component={TeamManagement} allowedRoles={["employer"]} />
         </Route>
         <Route path="/employer/employees/add">
-          <ProtectedRoute component={TeamManagement} allowedRoles={["employer"]} />
+          <ProtectedRoute component={AddEmployee} allowedRoles={["employer"]} />
         </Route>
         <Route path="/employer/employees/:id">
           <ProtectedRoute component={EmployeeProfile} allowedRoles={["employer"]} />
