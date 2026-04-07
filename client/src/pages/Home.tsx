@@ -8,21 +8,16 @@ import {
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen bg-white text-slate-900">
-
       {/* ── Hero ── */}
       <section className="relative overflow-hidden pt-20 pb-28 px-5 text-center bg-gradient-to-b from-slate-50 to-white">
         <div className="max-w-2xl mx-auto">
-          <span className="inline-block bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full mb-6 tracking-wide uppercase">
-            Built for small businesses
-          </span>
+          <span className="inline-block bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full mb-6 tracking-wide uppercase">Built for YOUR businesses</span>
           <h1 className="text-4xl sm:text-5xl font-bold leading-tight text-slate-900 mb-5">
             Manage your team.<br />
             Track your money.<br />
             <span className="text-primary">Run your ops.</span>
           </h1>
-          <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-lg mx-auto">
-            One app for job scheduling, financial tracking, and daily operations — built for small businesses that move fast.
-          </p>
+          <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-lg mx-auto">One app for job scheduling, financial tracking, and daily operations built for businesses that move fast.</p>
           <Link href="/auth">
             <Button size="lg" className="h-13 px-8 text-base font-semibold rounded-xl shadow-md shadow-primary/20">
               Get Started — Free <ArrowRight className="ml-2 h-4 w-4" />
@@ -37,7 +32,6 @@ export default function Home() {
         {/* Subtle bg decoration */}
         <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-white to-white" />
       </section>
-
       {/* ── How it works ── */}
       <section className="py-20 px-5 bg-white">
         <div className="max-w-4xl mx-auto">
@@ -78,7 +72,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       {/* ── Features ── */}
       <section className="py-20 px-5 bg-slate-50">
         <div className="max-w-4xl mx-auto">
@@ -99,7 +92,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       {/* ── Who it's for ── */}
       <section className="py-20 px-5 bg-white">
         <div className="max-w-4xl mx-auto">
@@ -140,7 +132,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       {/* ── Social proof ── */}
       <section className="py-14 px-5 bg-slate-50 text-center">
         <div className="max-w-xl mx-auto">
@@ -152,7 +143,6 @@ export default function Home() {
           <p className="text-slate-500 text-sm">We're starting local and growing with our customers.</p>
         </div>
       </section>
-
       {/* ── Final CTA ── */}
       <section className="py-24 px-5 bg-slate-900 text-white text-center">
         <div className="max-w-xl mx-auto">
@@ -165,7 +155,6 @@ export default function Home() {
           </Link>
         </div>
       </section>
-
       {/* ── Footer ── */}
       <footer className="bg-slate-900 border-t border-slate-800 px-5 py-8">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
@@ -181,7 +170,6 @@ export default function Home() {
           <p>© 2026 OptimaVia. All rights reserved.</p>
         </div>
       </footer>
-
     </div>
   );
 }
