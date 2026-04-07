@@ -1,0 +1,53 @@
+# Employee Database — Part 2: Employee List View
+
+## What to do
+
+Build the employee list UI in the Team tab. This replaces the current basic team list when the Employee Database module is toggled ON. If the module is OFF, keep the existing basic list as-is.
+
+## Employee list page (Team tab)
+
+### Top section
+- Heading: "Team" with a count badge showing total active employees, e.g. "Team (5)"
+- "Add Employee" button in the top right corner (primary brand color, white text)
+
+### Filter row
+- Horizontal toggle buttons: "All" | "Active" | "Inactive" | "Terminated"
+- Default selection: "Active"
+- Active filter button gets the primary brand color background, others are outlined
+- The count updates based on the filter
+
+### Search bar
+- Below the filters
+- Placeholder: "Search by name, title, or department"
+- Filters the list in real time as the user types
+
+### Employee list
+- Each employee is a card/row with:
+  - Left: circular avatar (44px). If profile photo exists, show it. If not, show initials on a light teal background `#E1F5EE` with dark teal text `#085041`
+  - Middle: employee full name (14px, font-weight 500) on top, job title below (12px, muted gray)
+  - Right: status badge
+    - Active: background `#E1F5EE`, text `#085041`
+    - Inactive: background `#F1EFE8`, text `#444441`
+    - Terminated: background `#FCEBEB`, text `#791F1F`
+  - Badge style: 11px, font-weight 500, padding 3px 8px, border-radius 8px
+- Cards have white background, 1px light gray border, border-radius 8px, padding 12px 14px, 8px gap between cards
+- Tapping a card navigates to the employee profile page (build in Part 3)
+- Sort employees alphabetically by last name
+
+### Empty states
+- If no employees exist: "No team members yet. Tap 'Add Employee' to get started."
+- If filter returns no results: "No {status} employees found."
+- If search returns no results: "No employees matching '{query}'."
+
+## Mobile-first design
+- Full width cards on mobile
+- Large tap targets (whole card is tappable)
+- Search bar and filters should be sticky at top when scrolling the list
+- Bottom nav bar stays fixed at bottom
+
+## Important
+- Only show this enhanced list when Employee Database module is ON
+- If module is OFF, show the existing basic team list unchanged
+- Do NOT build the employee profile detail page yet — that's Part 3
+- Do NOT build the Add Employee form yet — that's Part 4
+- Tapping a card and tapping "Add Employee" can navigate to placeholder pages for now

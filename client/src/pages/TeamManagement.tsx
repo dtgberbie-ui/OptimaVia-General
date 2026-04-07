@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Plus, Phone, Loader2, Users, Info, Copy, Check, KeyRound, Eye, EyeOff } from "lucide-react";
+import { useUser } from "@/hooks/use-auth";
+import {
+  Plus, Phone, Loader2, Users, Info, Copy, Check, KeyRound, Eye, EyeOff, Search
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,27 +15,266 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
 type Employee = {
   id: number; name: string | null; username: string; email: string | null;
   phone: string | null; role: string; status: string;
 };
 
-function initials(e: Employee) {
-  if (e.name) return e.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
-  return e.username.slice(0, 2).toUpperCase();
+type EmployeeProfile = {
+  jobTitle: string | null; department: string | null; employmentType: string | null;
+  payRate: number | null; payType: string | null; startDate: string | null;
+  profilePhotoUrl: string | null;
+};
+
+type EmployeeWithProfile = Employee & { employeeProfile: EmployeeProfile | null };
+
+type BusinessProfile = { companyName: string; enabledModules: string[] | null };
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function initials(name: string | null, username: string) {
+  if (name) return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  return username.slice(0, 2).toUpperCase();
 }
 
+function lastName(name: string | null) {
+  if (!name) return "";
+  const parts = name.trim().split(" ");
+  return parts[parts.length - 1].toLowerCase();
+}
+
+// ── Main export ──────────────────────────────────────────────────────────────
+
 export default function TeamManagement() {
+  const { data: user } = useUser();
+
+  const { data: profile } = useQuery<BusinessProfile>({
+    queryKey: ["/api/employer/profile", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employer/profile/${user?.id}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
+  const employeeDbEnabled = profile?.enabledModules?.includes("employee_database") ?? false;
+
+  return employeeDbEnabled ? <EnhancedTeamView /> : <BasicTeamView />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENHANCED VIEW (Employee Database module ON)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type StatusFilter = "all" | "active" | "inactive" | "terminated";
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "inactive", label: "Inactive" },
+  { key: "terminated", label: "Terminated" },
+];
+
+function statusBadgeStyle(status: string) {
+  if (status === "active")     return { bg: "#E1F5EE", color: "#085041" };
+  if (status === "terminated") return { bg: "#FCEBEB", color: "#791F1F" };
+  return { bg: "#F1EFE8", color: "#444441" };
+}
+
+function EnhancedTeamView() {
+  const [, navigate] = useLocation();
+  const [filter, setFilter] = useState<StatusFilter>("active");
+  const [search, setSearch] = useState("");
+
+  const { data: employees, isLoading } = useQuery<EmployeeWithProfile[]>({
+    queryKey: ["/api/employees"],
+  });
+
+  // Filter + search
+  const filtered = (employees ?? [])
+    .filter(e => filter === "all" || e.status === filter)
+    .filter(e => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        (e.name ?? "").toLowerCase().includes(q) ||
+        (e.employeeProfile?.jobTitle ?? "").toLowerCase().includes(q) ||
+        (e.employeeProfile?.department ?? "").toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => lastName(a.name).localeCompare(lastName(b.name)));
+
+  const activeCount = (employees ?? []).filter(e => e.status === "active").length;
+
+  function emptyMessage() {
+    if (search) return `No employees matching "${search}".`;
+    if (filter !== "all") return `No ${filter} employees found.`;
+    return "No team members yet. Tap 'Add Employee' to get started.";
+  }
+
+  return (
+    <div className="flex flex-col h-full max-w-lg mx-auto">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="px-4 pt-5 pb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-slate-900" data-testid="heading-team">Team</h1>
+          <span className="inline-flex items-center justify-center bg-slate-100 text-slate-600 text-xs font-semibold rounded-full px-2 py-0.5 min-w-[24px]">
+            {activeCount}
+          </span>
+        </div>
+        <Button
+          size="sm"
+          className="bg-primary text-white"
+          onClick={() => navigate("/employer/employees/add")}
+          data-testid="button-add-employee"
+        >
+          <Plus className="h-4 w-4 mr-1" /> Add Employee
+        </Button>
+      </div>
+
+      {/* ── Sticky filters + search ─────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 bg-white px-4 pb-3 border-b border-slate-100">
+        {/* Filter tabs */}
+        <div className="flex gap-1.5 mb-3">
+          {STATUS_FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              data-testid={`filter-${f.key}`}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                filter === f.key
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Search by name, title, or department"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 h-9 text-sm"
+            data-testid="input-search-employees"
+          />
+        </div>
+      </div>
+
+      {/* ── List ────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[68px] rounded-lg" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-12 text-center">
+            <Users className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+            <p className="text-sm text-slate-500">{emptyMessage()}</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(emp => (
+              <EnhancedEmployeeCard
+                key={emp.id}
+                emp={emp}
+                onClick={() => navigate(`/employer/employees/${emp.id}`)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EnhancedEmployeeCard({
+  emp, onClick,
+}: {
+  emp: EmployeeWithProfile;
+  onClick: () => void;
+}) {
+  const badge = statusBadgeStyle(emp.status);
+  const ini = initials(emp.name, emp.username);
+  const title = emp.employeeProfile?.jobTitle;
+  const dept = emp.employeeProfile?.department;
+  const subtitle = [title, dept].filter(Boolean).join(" · ");
+
+  return (
+    <button
+      className="w-full text-left bg-white border border-slate-200 rounded-lg px-3.5 py-3 flex items-center gap-3 hover:border-slate-300 hover:shadow-sm transition-all active:scale-[0.99]"
+      onClick={onClick}
+      data-testid={`employee-card-${emp.id}`}
+    >
+      {/* Avatar */}
+      {emp.employeeProfile?.profilePhotoUrl ? (
+        <img
+          src={emp.employeeProfile.profilePhotoUrl}
+          alt={emp.name ?? emp.username}
+          className="h-11 w-11 rounded-full object-cover shrink-0"
+        />
+      ) : (
+        <div
+          className="h-11 w-11 rounded-full flex items-center justify-center shrink-0 text-sm font-semibold"
+          style={{ backgroundColor: "#E1F5EE", color: "#085041" }}
+        >
+          {ini}
+        </div>
+      )}
+
+      {/* Name + title */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-slate-900 leading-tight" data-testid={`text-employee-name-${emp.id}`}>
+          {emp.name || emp.username}
+        </p>
+        {subtitle ? (
+          <p className="text-xs text-slate-400 mt-0.5 truncate">{subtitle}</p>
+        ) : (
+          <p className="text-xs text-slate-300 mt-0.5 italic">No title set</p>
+        )}
+      </div>
+
+      {/* Status badge */}
+      <span
+        className="shrink-0 font-medium"
+        style={{
+          backgroundColor: badge.bg,
+          color: badge.color,
+          fontSize: 11,
+          fontWeight: 500,
+          padding: "3px 8px",
+          borderRadius: 8,
+        }}
+        data-testid={`badge-status-${emp.id}`}
+      >
+        {emp.status.charAt(0).toUpperCase() + emp.status.slice(1)}
+      </span>
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BASIC VIEW (Employee Database module OFF — unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BasicTeamView() {
   const { toast } = useToast();
 
-  // ── Add employee state ──────────────────────────────────────────────────
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [showAddPw, setShowAddPw] = useState(false);
   const [addedLogin, setAddedLogin] = useState<{ handle: string; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // ── Reset password state ────────────────────────────────────────────────
   const [resetTarget, setResetTarget] = useState<Employee | null>(null);
   const [resetPw, setResetPw] = useState("");
   const [showResetPw, setShowResetPw] = useState(false);
@@ -41,7 +284,6 @@ export default function TeamManagement() {
     queryKey: ["/api/business/employees"],
   });
 
-  // ── Mutations ───────────────────────────────────────────────────────────
   const addMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/business/employees", data),
     onSuccess: (res: any) => {
@@ -65,60 +307,27 @@ export default function TeamManagement() {
   const resetMutation = useMutation({
     mutationFn: ({ id, password }: { id: number; password: string }) =>
       apiRequest("PATCH", `/api/business/employees/${id}/password`, { password }),
-    onSuccess: () => {
-      setResetDone(true);
-    },
+    onSuccess: () => setResetDone(true),
     onError: (err: any) => toast({ title: err?.message ?? "Failed to reset password", variant: "destructive" }),
   });
 
-  // ── Handlers ────────────────────────────────────────────────────────────
   function handleAdd() {
-    if (!form.password) {
-      toast({ title: "A temporary password is required", variant: "destructive" });
-      return;
-    }
-    if (!form.name && !form.email) {
-      toast({ title: "Name or email is required", variant: "destructive" });
-      return;
-    }
+    if (!form.password) { toast({ title: "A temporary password is required", variant: "destructive" }); return; }
+    if (!form.name && !form.email) { toast({ title: "Name or email is required", variant: "destructive" }); return; }
     addMutation.mutate(form);
   }
 
   function handleCopy(text: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
 
-  function handleAddClose() {
-    setShowAdd(false);
-    setAddedLogin(null);
-    setCopied(false);
-    setShowAddPw(false);
-  }
-
-  function openReset(emp: Employee) {
-    setResetTarget(emp);
-    setResetPw("");
-    setResetDone(false);
-    setShowResetPw(false);
-  }
-
+  function handleAddClose() { setShowAdd(false); setAddedLogin(null); setCopied(false); setShowAddPw(false); }
+  function openReset(emp: Employee) { setResetTarget(emp); setResetPw(""); setResetDone(false); setShowResetPw(false); }
   function handleReset() {
-    if (!resetPw || resetPw.length < 4) {
-      toast({ title: "Password must be at least 4 characters", variant: "destructive" });
-      return;
-    }
+    if (!resetPw || resetPw.length < 4) { toast({ title: "Password must be at least 4 characters", variant: "destructive" }); return; }
     if (resetTarget) resetMutation.mutate({ id: resetTarget.id, password: resetPw });
   }
-
-  function handleResetClose() {
-    setResetTarget(null);
-    setResetPw("");
-    setResetDone(false);
-    setShowResetPw(false);
-  }
+  function handleResetClose() { setResetTarget(null); setResetPw(""); setResetDone(false); setShowResetPw(false); }
 
   const active = employees?.filter(e => e.status !== "inactive") ?? [];
   const inactive = employees?.filter(e => e.status === "inactive") ?? [];
@@ -149,8 +358,7 @@ export default function TeamManagement() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Active ({active.length})</p>
               <div className="space-y-2 mb-4">
                 {active.map(emp => (
-                  <EmployeeCard
-                    key={emp.id} emp={emp}
+                  <BasicEmployeeCard key={emp.id} emp={emp}
                     onToggle={status => toggleStatus.mutate({ id: emp.id, status })}
                     toggling={toggleStatus.isPending}
                     onResetPassword={() => openReset(emp)}
@@ -164,8 +372,7 @@ export default function TeamManagement() {
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Inactive ({inactive.length})</p>
               <div className="space-y-2">
                 {inactive.map(emp => (
-                  <EmployeeCard
-                    key={emp.id} emp={emp}
+                  <BasicEmployeeCard key={emp.id} emp={emp}
                     onToggle={status => toggleStatus.mutate({ id: emp.id, status })}
                     toggling={toggleStatus.isPending}
                     onResetPassword={() => openReset(emp)}
@@ -177,13 +384,10 @@ export default function TeamManagement() {
         </div>
       )}
 
-      {/* ── Add Employee Dialog ─────────────────────────────────────────── */}
+      {/* Add Employee Dialog */}
       <Dialog open={showAdd} onOpenChange={v => !v && handleAddClose()}>
         <DialogContent className="max-w-sm mx-auto">
-          <DialogHeader>
-            <DialogTitle>{addedLogin ? "Employee Added" : "Add Team Member"}</DialogTitle>
-          </DialogHeader>
-
+          <DialogHeader><DialogTitle>{addedLogin ? "Employee Added" : "Add Team Member"}</DialogTitle></DialogHeader>
           {addedLogin ? (
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
@@ -260,15 +464,12 @@ export default function TeamManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Reset Password Dialog ───────────────────────────────────────── */}
+      {/* Reset Password Dialog */}
       <Dialog open={!!resetTarget} onOpenChange={v => !v && handleResetClose()}>
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
-            <DialogTitle>
-              {resetDone ? "Password Reset" : `Reset Password — ${resetTarget?.name || resetTarget?.username}`}
-            </DialogTitle>
+            <DialogTitle>{resetDone ? "Password Reset" : `Reset Password — ${resetTarget?.name || resetTarget?.username}`}</DialogTitle>
           </DialogHeader>
-
           {resetDone ? (
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-800">
@@ -330,7 +531,7 @@ export default function TeamManagement() {
   );
 }
 
-function EmployeeCard({ emp, onToggle, toggling, onResetPassword }: {
+function BasicEmployeeCard({ emp, onToggle, toggling, onResetPassword }: {
   emp: Employee;
   onToggle: (status: string) => void;
   toggling: boolean;
@@ -342,7 +543,7 @@ function EmployeeCard({ emp, onToggle, toggling, onResetPassword }: {
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
           <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 font-semibold text-sm ${isActive ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-400"}`}>
-            {initials(emp)}
+            {initials(emp.name, emp.username)}
           </div>
           <div className="min-w-0 flex-1">
             <p className={`font-semibold text-sm ${isActive ? "text-slate-900" : "text-slate-400"}`}>{emp.name || emp.username}</p>

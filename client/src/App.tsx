@@ -81,6 +81,12 @@ function Router() {
         <Route path="/employer/team">
           <ProtectedRoute component={TeamManagement} allowedRoles={["employer"]} />
         </Route>
+        <Route path="/employer/employees/add">
+          <ProtectedRoute component={TeamManagement} allowedRoles={["employer"]} />
+        </Route>
+        <Route path="/employer/employees/:id">
+          <ProtectedRoute component={TeamManagement} allowedRoles={["employer"]} />
+        </Route>
         <Route path="/employer/settings">
           <ProtectedRoute component={BusinessSettings} allowedRoles={["employer"]} />
         </Route>
