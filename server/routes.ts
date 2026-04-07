@@ -10,6 +10,7 @@ import { users, jobs, workerProfiles, applications, employerProfiles, industryCo
 import { eq, and } from "drizzle-orm";
 import crypto, { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
+import { sendWelcomeEmail, sendPasswordResetEmail } from "./email";
 
 const scryptAsync = promisify(scrypt);
 async function hashPassword(password: string) {
@@ -774,6 +775,19 @@ Apply now at ${profile?.companyName || 'our company'}!`;
       phone: phone || null,
       businessId: req.user.id,
     });
+
+    // Send welcome email if employee has an email address
+    if (email && email.trim()) {
+      const profile = await storage.getEmployerProfile(req.user.id);
+      sendWelcomeEmail({
+        to: email.trim(),
+        employeeName: name || loginHandle,
+        businessName: profile?.companyName ?? "your employer",
+        loginHandle,
+        password,
+      }).catch(() => {}); // Fire-and-forget — don't block account creation
+    }
+
     res.status(201).json({ ...employee, loginHandle });
   });
 
@@ -793,6 +807,19 @@ Apply now at ${profile?.companyName || 'our company'}!`;
     }
     const hashedPw = await hashPassword(password);
     const updated = await storage.updateUser(id, { password: hashedPw });
+
+    // Send password reset notification if employee has an email
+    if (updated.email) {
+      const profile = await storage.getEmployerProfile(req.user.id);
+      sendPasswordResetEmail({
+        to: updated.email,
+        employeeName: updated.name || updated.username,
+        businessName: profile?.companyName ?? "your employer",
+        loginHandle: updated.username,
+        newPassword: password,
+      }).catch(() => {}); // Fire-and-forget
+    }
+
     res.json({ success: true, username: updated.username });
   });
 
